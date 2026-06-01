@@ -4,873 +4,491 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>PANSA BLASTER — Admin Panel</title>
+
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
 <script src="/socket.io/socket.io.js"></script>
+
+<script>
+  // Tailwind custom configuration for seamless light-theme enterprise styling
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          mono: ['"JetBrains Mono"', 'monospace'],
+        },
+        colors: {
+          brand: {
+            50: '#f0fdf4',
+            100: '#dcfce7',
+            500: '#10b981',
+            600: '#059669',
+            700: '#047857',
+            glow: 'rgba(16, 185, 129, 0.15)'
+          },
+          panel: {
+            bg: '#f8fafc',
+            card: '#ffffff',
+            border: '#e2e8f0',
+            text: '#0f172a',
+            muted: '#64748b'
+          }
+        }
+      }
+    }
+  }
+</script>
+
 <style>
-/* ══════════════════════════════════════
-   RESET & TOKENS
-══════════════════════════════════════ */
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg0:#07080c;
-  --bg1:#0d0f16;
-  --bg2:#13161f;
-  --bg3:#1a1e2b;
-  --border:#232738;
-  --border2:#2e3347;
-  --green:#14f195;
-  --green-dim:rgba(20,241,149,.12);
-  --green-glow:rgba(20,241,149,.25);
-  --red:#f1365a;
-  --red-dim:rgba(241,54,90,.12);
-  --yellow:#f5ca14;
-  --yellow-dim:rgba(245,202,20,.12);
-  --blue:#3d9eff;
-  --blue-dim:rgba(61,158,255,.12);
-  --text:#e2e6f4;
-  --text2:#8892b0;
-  --text3:#4a5270;
-  --font:'Outfit',sans-serif;
-  --mono:'DM Mono',monospace;
-  --radius:10px;
-  --sidebar:240px;
-  --transition:.2s cubic-bezier(.4,0,.2,1);
-}
+  /* Custom scrollbar and subtle layout overlays */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; }
+  ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-html{scroll-behavior:smooth}
-body{
-  font-family:var(--font);
-  background:var(--bg0);
-  color:var(--text);
-  min-height:100vh;
-  overflow-x:hidden;
-}
+  /* Smooth page dynamic transitions */
+  .page { display: none; animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+  .page.active { display: block; }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 
-/* ── SCROLLBAR ── */
-::-webkit-scrollbar{width:4px;height:4px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+  /* Pulse glass animation for connecting state */
+  .pulse-glow { animation: pulseGlow 2s infinite ease-in-out; }
+  @keyframes pulseGlow { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.4); } 50% { opacity: 0.6; box-shadow: 0 0 0 8px rgba(234, 179, 8, 0); } }
 
-/* ══════════════════════════════════════
-   LAYOUT
-══════════════════════════════════════ */
-#shell{display:flex;min-height:100vh}
-
-/* ══════════════════════════════════════
-   SIDEBAR
-══════════════════════════════════════ */
-#sidebar{
-  width:var(--sidebar);
-  background:var(--bg1);
-  border-right:1px solid var(--border);
-  display:flex;flex-direction:column;
-  position:fixed;top:0;left:0;bottom:0;z-index:200;
-  transition:transform var(--transition);
-}
-
-.sb-brand{
-  padding:24px 20px 20px;
-  border-bottom:1px solid var(--border);
-  display:flex;align-items:center;gap:12px;
-}
-.sb-brand-icon{
-  width:36px;height:36px;border-radius:8px;
-  background:linear-gradient(135deg,var(--green),#00c47a);
-  display:flex;align-items:center;justify-content:center;
-  font-size:1.1rem;flex-shrink:0;
-}
-.sb-brand-name{font-size:1rem;font-weight:700;letter-spacing:.02em}
-.sb-brand-sub{font-size:.68rem;color:var(--text3);font-family:var(--mono);margin-top:2px}
-
-.sb-section{padding:16px 12px 4px;font-size:.65rem;font-family:var(--mono);letter-spacing:.12em;color:var(--text3);text-transform:uppercase}
-
-.sb-nav{flex:1;padding:4px 10px;display:flex;flex-direction:column;gap:2px}
-
-.nav-item{
-  display:flex;align-items:center;gap:10px;
-  padding:9px 12px;border-radius:8px;
-  cursor:pointer;font-size:.88rem;font-weight:500;
-  color:var(--text2);border:1px solid transparent;
-  transition:var(--transition);user-select:none;
-}
-.nav-item .icon{font-size:1.05rem;width:22px;text-align:center;flex-shrink:0}
-.nav-item:hover{background:var(--bg2);color:var(--text)}
-.nav-item.active{
-  background:var(--green-dim);
-  border-color:rgba(20,241,149,.2);
-  color:var(--green);
-}
-.nav-item .badge-count{
-  margin-left:auto;font-size:.65rem;font-family:var(--mono);
-  background:var(--green-dim);color:var(--green);
-  padding:1px 7px;border-radius:20px;
-  border:1px solid rgba(20,241,149,.2);
-}
-
-.sb-footer{
-  padding:14px 12px;border-top:1px solid var(--border);
-}
-.wa-pill{
-  display:flex;align-items:center;gap:8px;
-  padding:8px 12px;border-radius:8px;
-  background:var(--bg2);border:1px solid var(--border);
-  font-size:.8rem;
-  transition:var(--transition);cursor:default;
-}
-.wa-pill.connected{border-color:rgba(20,241,149,.3);background:var(--green-dim)}
-.wa-pill.disconnected{border-color:rgba(241,54,90,.3);background:var(--red-dim)}
-.wa-pill.connecting{border-color:rgba(245,202,20,.3);background:var(--yellow-dim)}
-.wa-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--text3);flex-shrink:0;transition:var(--transition)}
-.wa-pill.connected .dot{background:var(--green);box-shadow:0 0 6px var(--green)}
-.wa-pill.disconnected .dot{background:var(--red)}
-.wa-pill.connecting .dot{background:var(--yellow);animation:blink .8s infinite}
-.wa-num{font-family:var(--mono);font-size:.75rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px}
-
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
-
-/* SIDEBAR OVERLAY (mobile) */
-#sb-overlay{
-  display:none;position:fixed;inset:0;
-  background:rgba(0,0,0,.6);z-index:199;
-  backdrop-filter:blur(2px);
-}
-
-/* ══════════════════════════════════════
-   MAIN
-══════════════════════════════════════ */
-#main{
-  margin-left:var(--sidebar);
-  flex:1;display:flex;flex-direction:column;min-height:100vh;
-}
-
-/* ── TOPBAR ── */
-#topbar{
-  height:58px;
-  display:flex;align-items:center;justify-content:space-between;
-  padding:0 28px;
-  border-bottom:1px solid var(--border);
-  background:rgba(7,8,12,.85);
-  backdrop-filter:blur(16px);
-  position:sticky;top:0;z-index:100;
-  gap:16px;
-}
-.topbar-left{display:flex;align-items:center;gap:12px}
-#hamburger{
-  display:none;background:none;border:none;cursor:pointer;
-  color:var(--text2);font-size:1.3rem;padding:4px;
-  border-radius:6px;transition:var(--transition);
-}
-#hamburger:hover{color:var(--text);background:var(--bg2)}
-.page-title{font-size:1rem;font-weight:600;color:var(--text)}
-.page-subtitle{font-size:.75rem;color:var(--text3);margin-top:1px}
-
-.topbar-right{display:flex;align-items:center;gap:8px}
-.tb-btn{
-  display:flex;align-items:center;gap:6px;
-  padding:7px 14px;border-radius:7px;
-  font-family:var(--font);font-size:.8rem;font-weight:600;
-  border:none;cursor:pointer;transition:var(--transition);
-}
-.tb-btn-ghost{background:var(--bg2);color:var(--text2);border:1px solid var(--border)}
-.tb-btn-ghost:hover{color:var(--text);border-color:var(--border2)}
-.tb-btn-danger{background:var(--red-dim);color:var(--red);border:1px solid rgba(241,54,90,.25)}
-.tb-btn-danger:hover{background:rgba(241,54,90,.2)}
-
-/* ── CONTENT ── */
-#content{flex:1;padding:28px;max-width:100%}
-
-/* ══════════════════════════════════════
-   PAGES
-══════════════════════════════════════ */
-.page{display:none;animation:pageIn .22s ease}
-.page.active{display:block}
-@keyframes pageIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-
-/* ══════════════════════════════════════
-   GRID HELPERS
-══════════════════════════════════════ */
-.g2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
-.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-.g-auto{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
-.col-span2{grid-column:span 2}
-
-/* ══════════════════════════════════════
-   CARDS
-══════════════════════════════════════ */
-.card{
-  background:var(--bg1);
-  border:1px solid var(--border);
-  border-radius:var(--radius);
-  padding:20px 22px;
-}
-.card-sm{padding:16px 18px}
-.card-title{
-  font-size:.7rem;font-family:var(--mono);letter-spacing:.1em;
-  text-transform:uppercase;color:var(--text3);
-  margin-bottom:16px;
-  display:flex;align-items:center;justify-content:space-between;
-}
-.card-title-left{display:flex;align-items:center;gap:6px}
-.card-title-left::before{content:'';width:3px;height:12px;background:var(--green);border-radius:2px}
-
-/* ══════════════════════════════════════
-   STAT CARDS
-══════════════════════════════════════ */
-.stat-card{
-  padding:20px;
-  background:var(--bg1);border:1px solid var(--border);
-  border-radius:var(--radius);
-  display:flex;flex-direction:column;gap:12px;
-  position:relative;overflow:hidden;
-  transition:border-color var(--transition);
-}
-.stat-card::after{
-  content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
-  background:var(--c,var(--green));opacity:.4;border-radius:0 0 var(--radius) var(--radius);
-}
-.stat-card:hover{border-color:var(--border2)}
-.stat-top{display:flex;align-items:center;justify-content:space-between}
-.stat-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1rem;background:var(--ic,var(--green-dim))}
-.stat-change{font-size:.72rem;font-family:var(--mono);color:var(--text3)}
-.stat-num{font-size:2rem;font-weight:700;line-height:1;font-family:var(--mono);color:var(--c,var(--green));transition:all .3s}
-.stat-label{font-size:.78rem;color:var(--text2)}
-
-/* ══════════════════════════════════════
-   PROGRESS BAR
-══════════════════════════════════════ */
-.progress-wrap{height:5px;background:var(--bg3);border-radius:3px;overflow:hidden;margin:8px 0}
-.progress-bar{height:100%;background:linear-gradient(90deg,var(--green),#00e87c);border-radius:3px;transition:width .5s ease;min-width:0}
-.progress-meta{display:flex;justify-content:space-between;font-size:.72rem;font-family:var(--mono);color:var(--text3);margin-top:4px}
-
-/* ══════════════════════════════════════
-   FORM ELEMENTS
-══════════════════════════════════════ */
-.form-group{margin-bottom:15px}
-.form-group label{
-  display:block;font-size:.75rem;font-weight:600;
-  color:var(--text2);margin-bottom:6px;letter-spacing:.02em;
-}
-.form-hint{font-size:.7rem;color:var(--text3);margin-top:4px}
-
-input[type=text],input[type=tel],input[type=email],
-input[type=password],textarea,select{
-  width:100%;background:var(--bg2);color:var(--text);
-  border:1px solid var(--border);border-radius:8px;
-  padding:10px 14px;font-family:var(--font);font-size:.88rem;
-  outline:none;transition:border-color var(--transition),box-shadow var(--transition);
-  -webkit-appearance:none;appearance:none;
-}
-input:focus,textarea:focus,select:focus{
-  border-color:var(--green);
-  box-shadow:0 0 0 3px var(--green-dim);
-}
-textarea{resize:vertical;min-height:100px;line-height:1.6}
-select{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238892b0' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:36px}
-
-/* ══════════════════════════════════════
-   BUTTONS
-══════════════════════════════════════ */
-.btn{
-  display:inline-flex;align-items:center;justify-content:center;gap:7px;
-  padding:9px 20px;border-radius:8px;
-  font-family:var(--font);font-size:.85rem;font-weight:600;
-  border:none;cursor:pointer;transition:var(--transition);
-  white-space:nowrap;
-}
-.btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important;filter:none!important}
-.btn-primary{background:var(--green);color:#040a07}
-.btn-primary:hover:not(:disabled){background:#18ffab;transform:translateY(-1px);box-shadow:0 4px 16px var(--green-glow)}
-.btn-danger{background:var(--red-dim);color:var(--red);border:1px solid rgba(241,54,90,.25)}
-.btn-danger:hover:not(:disabled){background:rgba(241,54,90,.22)}
-.btn-ghost{background:var(--bg3);color:var(--text2);border:1px solid var(--border)}
-.btn-ghost:hover:not(:disabled){border-color:var(--border2);color:var(--text)}
-.btn-blue{background:var(--blue-dim);color:var(--blue);border:1px solid rgba(61,158,255,.25)}
-.btn-blue:hover:not(:disabled){background:rgba(61,158,255,.2)}
-.btn-full{width:100%}
-.btn-sm{padding:6px 14px;font-size:.78rem}
-.btn-icon{padding:8px;border-radius:7px;background:var(--bg3);border:1px solid var(--border);color:var(--text2);cursor:pointer;transition:var(--transition);font-size:.95rem;line-height:1}
-.btn-icon:hover{color:var(--text);border-color:var(--border2)}
-
-/* BLAST BUTTON — big CTA */
-.btn-blast{
-  padding:13px 28px;font-size:1rem;font-weight:700;letter-spacing:.03em;
-  background:var(--green);color:#040a07;border-radius:10px;border:none;
-  cursor:pointer;width:100%;transition:var(--transition);
-  position:relative;overflow:hidden;
-}
-.btn-blast::before{
-  content:'';position:absolute;inset:0;
-  background:linear-gradient(135deg,rgba(255,255,255,.15),transparent);
-}
-.btn-blast:hover:not(:disabled){background:#18ffab;box-shadow:0 6px 24px var(--green-glow);transform:translateY(-2px)}
-.btn-blast:disabled{opacity:.35;cursor:not-allowed;transform:none;box-shadow:none}
-.btn-stop{background:var(--red-dim);color:var(--red);border:1px solid rgba(241,54,90,.3)}
-.btn-stop:hover:not(:disabled){background:rgba(241,54,90,.22);box-shadow:0 4px 16px rgba(241,54,90,.2);transform:translateY(-1px)}
-
-/* ══════════════════════════════════════
-   BADGES / STATUS PILLS
-══════════════════════════════════════ */
-.pill{
-  display:inline-flex;align-items:center;gap:5px;
-  padding:3px 10px;border-radius:20px;
-  font-size:.7rem;font-weight:600;font-family:var(--mono);
-  letter-spacing:.04em;
-}
-.pill-sent    {background:var(--green-dim);color:var(--green);border:1px solid rgba(20,241,149,.25)}
-.pill-failed  {background:var(--red-dim);color:var(--red);border:1px solid rgba(241,54,90,.25)}
-.pill-skip    {background:var(--yellow-dim);color:var(--yellow);border:1px solid rgba(245,202,20,.25)}
-.pill-pending {background:var(--bg3);color:var(--text3);border:1px solid var(--border)}
-.pill-dot{width:5px;height:5px;border-radius:50%;background:currentColor}
-
-/* ══════════════════════════════════════
-   ALERTS
-══════════════════════════════════════ */
-.alert{
-  padding:10px 14px;border-radius:8px;font-size:.83rem;
-  display:none;margin-bottom:14px;
-  animation:alertIn .2s ease;
-}
-.alert.show{display:flex;align-items:center;gap:8px}
-@keyframes alertIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
-.alert-success{background:var(--green-dim);color:var(--green);border:1px solid rgba(20,241,149,.25)}
-.alert-error  {background:var(--red-dim);color:var(--red);border:1px solid rgba(241,54,90,.25)}
-.alert-info   {background:var(--blue-dim);color:var(--blue);border:1px solid rgba(61,158,255,.25)}
-.alert-warn   {background:var(--yellow-dim);color:var(--yellow);border:1px solid rgba(245,202,20,.25)}
-
-/* ══════════════════════════════════════
-   LOG TABLE
-══════════════════════════════════════ */
-.table-wrap{
-  overflow:auto;border-radius:8px;border:1px solid var(--border);
-  max-height:400px;
-}
-table{width:100%;border-collapse:collapse;font-size:.83rem}
-thead{position:sticky;top:0;z-index:2;background:var(--bg2)}
-th{
-  font-family:var(--mono);font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;
-  color:var(--text3);padding:10px 14px;text-align:left;
-  border-bottom:1px solid var(--border);font-weight:500;
-}
-td{padding:9px 14px;border-bottom:1px solid rgba(35,39,56,.5);color:var(--text2)}
-tr:last-child td{border-bottom:none}
-tr.new-row{animation:rowFlash .5s ease}
-@keyframes rowFlash{0%{background:rgba(20,241,149,.08)}100%{background:transparent}}
-td.mono{font-family:var(--mono);font-size:.8rem}
-
-/* ══════════════════════════════════════
-   TERMINAL
-══════════════════════════════════════ */
-.terminal{
-  background:var(--bg0);border:1px solid var(--border);border-radius:8px;
-  padding:14px 16px;height:200px;overflow-y:auto;
-  font-family:var(--mono);font-size:.76rem;line-height:1.8;
-}
-.t-line{display:flex;gap:8px}
-.t-ts{color:var(--text3);flex-shrink:0}
-.t-msg.ok  {color:var(--green)}
-.t-msg.err {color:var(--red)}
-.t-msg.warn{color:var(--yellow)}
-.t-msg.info{color:var(--text2)}
-
-/* ══════════════════════════════════════
-   DROPZONE
-══════════════════════════════════════ */
-.dropzone{
-  border:2px dashed var(--border2);border-radius:8px;
-  padding:28px 20px;text-align:center;cursor:pointer;
-  transition:var(--transition);background:var(--bg2);
-  position:relative;
-}
-.dropzone:hover,.dropzone.drag{
-  border-color:var(--green);background:var(--green-dim);
-}
-.dropzone input{position:absolute;inset:0;opacity:0;cursor:pointer}
-.dz-icon{font-size:1.8rem;margin-bottom:8px}
-.dz-label{font-size:.83rem;color:var(--text2)}
-.dz-label span{color:var(--green);font-weight:600}
-.dz-file{font-family:var(--mono);font-size:.75rem;color:var(--green);margin-top:6px}
-.dz-hint{font-size:.72rem;color:var(--text3);margin-top:4px}
-
-/* ══════════════════════════════════════
-   TEMPLATE CARDS
-══════════════════════════════════════ */
-.tpl-list{display:flex;flex-direction:column;gap:10px;max-height:500px;overflow-y:auto}
-.tpl-card{
-  background:var(--bg2);border:1px solid var(--border);
-  border-radius:8px;padding:14px 16px;
-  display:flex;gap:12px;align-items:flex-start;
-  transition:border-color var(--transition);
-  cursor:default;
-}
-.tpl-card:hover{border-color:var(--border2)}
-.tpl-card-body{flex:1;min-width:0}
-.tpl-card-title{font-weight:600;font-size:.88rem;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tpl-card-preview{font-size:.77rem;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tpl-card-actions{display:flex;gap:6px;flex-shrink:0;align-items:center}
-
-/* ══════════════════════════════════════
-   PAIRING CODE BOX
-══════════════════════════════════════ */
-.pair-code-box{
-  margin-top:14px;padding:20px;
-  background:var(--green-dim);border:1px dashed rgba(20,241,149,.4);
-  border-radius:8px;text-align:center;display:none;
-}
-.pair-code{
-  font-family:var(--mono);font-size:2.2rem;font-weight:500;
-  letter-spacing:.4em;color:var(--green);
-}
-.pair-hint{font-size:.78rem;color:var(--text3);margin-top:8px;line-height:1.6}
-
-/* ══════════════════════════════════════
-   SECTION DIVIDER
-══════════════════════════════════════ */
-.divider{height:1px;background:var(--border);margin:22px 0}
-.section-title{font-size:.88rem;font-weight:700;color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:8px}
-
-/* ══════════════════════════════════════
-   SPINTAX PREVIEW
-══════════════════════════════════════ */
-.spintax-hint{
-  background:var(--bg2);border:1px solid var(--border);
-  border-radius:7px;padding:10px 14px;
-  font-size:.78rem;color:var(--text2);line-height:1.6;
-  font-family:var(--mono);
-}
-.spintax-hint code{color:var(--green);background:var(--green-dim);padding:1px 5px;border-radius:3px}
-
-/* ══════════════════════════════════════
-   MODAL
-══════════════════════════════════════ */
-.modal-overlay{
-  position:fixed;inset:0;background:rgba(0,0,0,.7);
-  z-index:500;display:none;align-items:center;justify-content:center;
-  padding:20px;backdrop-filter:blur(4px);
-}
-.modal-overlay.open{display:flex;animation:fadeOverlay .2s ease}
-@keyframes fadeOverlay{from{opacity:0}to{opacity:1}}
-.modal{
-  background:var(--bg1);border:1px solid var(--border2);
-  border-radius:12px;width:100%;max-width:480px;
-  animation:modalIn .22s ease;
-}
-@keyframes modalIn{from{opacity:0;transform:scale(.96) translateY(-8px)}to{opacity:1;transform:none}}
-.modal-header{
-  padding:18px 22px 0;
-  display:flex;align-items:center;justify-content:space-between;
-  font-weight:700;font-size:.95rem;
-}
-.modal-body{padding:16px 22px 22px}
-.modal-close{background:none;border:none;cursor:pointer;color:var(--text3);font-size:1.2rem;transition:var(--transition)}
-.modal-close:hover{color:var(--red)}
-.modal-footer{display:flex;gap:10px;justify-content:flex-end;padding-top:14px}
-
-/* ══════════════════════════════════════
-   RESPONSIVE — TABLET
-══════════════════════════════════════ */
-@media(max-width:1024px){
-  .g4{grid-template-columns:repeat(2,1fr)}
-}
-
-/* ══════════════════════════════════════
-   RESPONSIVE — MOBILE
-══════════════════════════════════════ */
-@media(max-width:768px){
-  :root{--sidebar:240px}
-  #sidebar{transform:translateX(-100%)}
-  #sidebar.open{transform:none}
-  #sb-overlay.open{display:block}
-  #main{margin-left:0}
-  #hamburger{display:flex}
-  #content{padding:16px}
-  .g2,.g3,.g4{grid-template-columns:1fr}
-  .col-span2{grid-column:span 1}
-  .topbar-right .tb-btn span{display:none}
-  .topbar-right .tb-btn{padding:7px 10px}
-  table{font-size:.78rem}
-  th,td{padding:8px 10px}
-  .pair-code{font-size:1.6rem;letter-spacing:.25em}
-}
-
-@media(max-width:420px){
-  .stat-num{font-size:1.6rem}
-  .btn-blast{font-size:.88rem;padding:11px 18px}
-}
-
-/* ══════════════════════════════════════
-   RECONNECT BANNER
-══════════════════════════════════════ */
-#reconnect-banner{
-  display:none;padding:8px 20px;
-  background:linear-gradient(90deg,rgba(245,202,20,.12),rgba(245,202,20,.05));
-  border-bottom:1px solid rgba(245,202,20,.2);
-  font-size:.78rem;color:var(--yellow);
-  text-align:center;font-family:var(--mono);
-  animation:pulse2 1.5s infinite;
-}
-#reconnect-banner.show{display:block}
-@keyframes pulse2{0%,100%{opacity:1}50%{opacity:.6}}
-
-/* ══════════════════════════════════════
-   EMPTY STATE
-══════════════════════════════════════ */
-.empty-state{
-  text-align:center;padding:40px 20px;color:var(--text3);
-}
-.empty-state .icon{font-size:2.5rem;margin-bottom:10px;opacity:.5}
-.empty-state p{font-size:.85rem}
+  /* Realtime dynamic badge flasher */
+  @keyframes rowFlash { 0% { background-color: rgba(16, 185, 129, 0.15); } 100% { background-color: transparent; } }
+  .new-row { animation: rowFlash 0.8s ease-out forwards; }
 </style>
 </head>
-<body>
+<body class="bg-panel-bg text-panel-text font-sans min-height-screen antialiased selection:bg-brand-100">
 
-<!-- ══════════════════ SIDEBAR ══════════════════ -->
-<div id="sb-overlay" onclick="closeSidebar()"></div>
-<aside id="sidebar">
-  <div class="sb-brand">
-    <div class="sb-brand-icon">📡</div>
-    <div>
-      <div class="sb-brand-name">PANSA BLASTER</div>
-      <div class="sb-brand-sub">v2.0 · admin panel</div>
-    </div>
-  </div>
+<div id="sb-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[199] hidden transition-opacity duration-300 opacity-0" onclick="closeSidebar()"></div>
 
-  <div class="sb-section">Menu</div>
-  <nav class="sb-nav">
-    <div class="nav-item active" data-page="dashboard" onclick="nav(this,'dashboard')">
-      <span class="icon">📊</span> Dashboard
-    </div>
-    <div class="nav-item" data-page="kampanye" onclick="nav(this,'kampanye')">
-      <span class="icon">🚀</span> Kampanye
-    </div>
-    <div class="nav-item" data-page="template" onclick="nav(this,'template')">
-      <span class="icon">📝</span> Template
-    </div>
-    <div class="nav-item" data-page="koneksi" onclick="nav(this,'koneksi')">
-      <span class="icon">📱</span> Koneksi WA
-    </div>
-  </nav>
+<div id="reconnect-banner" class="fixed top-0 left-0 right-0 bg-yellow-500 text-white text-xs font-mono py-2 text-center z-[999] shadow-sm hidden items-center justify-center gap-2 font-medium">
+  <i data-lucide="refresh-cw" class="w-3.5 h-3.5 animate-spin"></i>
+  Koneksi Terputus! Mencoba menghubungkan kembali ke mesin WhatsApp...
+</div>
 
-  <div class="sb-footer">
-    <div class="wa-pill disconnected" id="waPill">
-      <div class="dot"></div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:.75rem;font-weight:600" id="waPillLabel">Tidak Terhubung</div>
-        <div class="wa-num" id="waPillNum">—</div>
+<div id="shell" class="flex min-h-screen">
+
+  <aside id="sidebar" class="w-64 bg-white border-right border-panel-border flex flex-col fixed top-0 bottom-0 left-0 z-[200] transition-transform duration-300 -translate-x-full md:translate-x-0 border-r shadow-sm">
+    <div class="p-6 border-b border-panel-border flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-500 to-emerald-400 flex items-center justify-center shadow-md shadow-brand-glow text-white">
+        <i data-lucide="radio" class="w-5 h-5"></i>
       </div>
-    </div>
-  </div>
-</aside>
-
-<!-- ══════════════════ MAIN ══════════════════ -->
-<div id="main">
-
-  <!-- RECONNECT BANNER -->
-  <div id="reconnect-banner">⚡ Menghubungkan ulang ke WhatsApp...</div>
-
-  <!-- TOPBAR -->
-  <header id="topbar">
-    <div class="topbar-left">
-      <button id="hamburger" onclick="toggleSidebar()">☰</button>
       <div>
-        <div class="page-title" id="topTitle">Dashboard</div>
-        <div class="page-subtitle" id="topSub">Overview kampanye blast</div>
+        <div class="font-extrabold text-sm tracking-tight text-slate-800">PANSA BLASTER</div>
+        <div class="text-[10px] font-mono text-panel-muted tracking-wider uppercase mt-0.5">Enterprise Dashboard</div>
       </div>
     </div>
-    <div class="topbar-right">
-      <button class="tb-btn tb-btn-ghost" onclick="refreshStats()" title="Refresh">
-        🔄 <span>Refresh</span>
+
+    <div class="text-[10px] font-mono font-bold uppercase tracking-widest text-slate-400 px-6 pt-6 pb-2">Menu Utama</div>
+    <nav class="flex-1 px-4 flex flex-col gap-1">
+      <button data-page="dashboard" onclick="nav(this,'dashboard')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-panel-muted border border-transparent transition-all active">
+        <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard
       </button>
-      <button class="tb-btn tb-btn-danger" onclick="confirmLogout()" title="Logout WA">
-        🔌 <span>Logout WA</span>
+      <button data-page="kampanye" onclick="nav(this,'kampanye')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-panel-muted border border-transparent transition-all">
+        <i data-lucide="rocket" class="w-4 h-4"></i> Kampanye Blast
       </button>
-    </div>
-  </header>
+      <button data-page="template" onclick="nav(this,'template')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-panel-muted border border-transparent transition-all">
+        <i data-lucide="file-text" class="w-4 h-4"></i> Template Pesan
+      </button>
+      <button data-page="koneksi" onclick="nav(this,'koneksi')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-panel-muted border border-transparent transition-all">
+        <i data-lucide="smartphone" class="w-4 h-4"></i> Integrasi Device
+      </button>
+    </nav>
 
-  <!-- CONTENT -->
-  <div id="content">
-
-    <!-- ══ PAGE: DASHBOARD ══ -->
-    <div class="page active" id="page-dashboard">
-      <div class="g4" style="margin-bottom:20px" id="statCards">
-        <div class="stat-card" style="--c:var(--text2);--ic:var(--bg3)">
-          <div class="stat-top">
-            <div class="stat-icon">🎯</div>
-            <div class="stat-change">total</div>
-          </div>
-          <div class="stat-num" id="s-total">0</div>
-          <div class="stat-label">Total Target</div>
-        </div>
-        <div class="stat-card" style="--c:var(--green);--ic:var(--green-dim)">
-          <div class="stat-top">
-            <div class="stat-icon">✅</div>
-            <div class="stat-change">sent</div>
-          </div>
-          <div class="stat-num" id="s-sent">0</div>
-          <div class="stat-label">Terkirim</div>
-        </div>
-        <div class="stat-card" style="--c:var(--red);--ic:var(--red-dim)">
-          <div class="stat-top">
-            <div class="stat-icon">❌</div>
-            <div class="stat-change">failed</div>
-          </div>
-          <div class="stat-num" id="s-failed">0</div>
-          <div class="stat-label">Gagal</div>
-        </div>
-        <div class="stat-card" style="--c:var(--yellow);--ic:var(--yellow-dim)">
-          <div class="stat-top">
-            <div class="stat-icon">⏭️</div>
-            <div class="stat-change">skip</div>
-          </div>
-          <div class="stat-num" id="s-skip">0</div>
-          <div class="stat-label">Tidak WA</div>
-        </div>
-      </div>
-
-      <!-- PROGRESS -->
-      <div class="card" style="margin-bottom:20px">
-        <div class="card-title">
-          <div class="card-title-left">Progress Blast</div>
-          <span id="blastStatusPill" style="font-size:.7rem;color:var(--text3)">Idle</span>
-        </div>
-        <div class="progress-wrap"><div class="progress-bar" id="progressBar" style="width:0%"></div></div>
-        <div class="progress-meta">
-          <span id="progressText">0 / 0</span>
-          <span id="progressPct">0%</span>
-        </div>
-      </div>
-
-      <!-- LOG TABLE -->
-      <div class="card">
-        <div class="card-title">
-          <div class="card-title-left">Log Realtime</div>
-          <button class="btn-icon" onclick="clearLog()" title="Clear log">🗑</button>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>#</th><th>Nomor</th><th>Status</th><th>Waktu</th>
-              </tr>
-            </thead>
-            <tbody id="logBody">
-              <tr><td colspan="4"><div class="empty-state"><div class="icon">📭</div><p>Belum ada data</p></div></td></tr>
-            </tbody>
-          </table>
+    <div class="p-4 border-t border-panel-border bg-slate-50/70">
+      <div id="waPill" class="flex items-center gap-3 p-3 rounded-xl border bg-white transition-all duration-300">
+        <div id="waDot" class="w-2.5 h-2.5 rounded-full bg-slate-300"></div>
+        <div class="flex-1 min-w-0">
+          <div id="waPillLabel" class="text-xs font-bold text-slate-700">Mengecek Status...</div>
+          <div id="waPillNum" class="text-[11px] font-mono text-panel-muted mt-0.5 truncate">—</div>
         </div>
       </div>
     </div>
+  </aside>
 
-    <!-- ══ PAGE: KAMPANYE ══ -->
-    <div class="page" id="page-kampanye">
-      <div class="g2">
-
-        <!-- SETUP -->
+  <div id="main" class="flex-1 md:ml-64 flex flex-col min-h-screen transition-all duration-300">
+    
+    <header id="topbar" class="h-16 border-b border-panel-border bg-white/80 backdrop-blur-md sticky top-0 z-[100] px-6 flex items-center justify-between gap-4 shadow-sm">
+      <div class="flex items-center gap-4">
+        <button id="hamburger" onclick="toggleSidebar()" class="md:hidden p-2 rounded-lg text-panel-muted hover:bg-slate-100 transition-colors">
+          <i data-lucide="menu" class="w-5 h-5"></i>
+        </button>
         <div>
-          <div class="card">
-            <div class="card-title"><div class="card-title-left">Setup Kampanye</div></div>
-            <div id="alertKampanye" class="alert"></div>
+          <h1 id="topTitle" class="font-bold text-base text-slate-800 leading-tight">Dashboard</h1>
+          <p id="topSub" class="text-xs text-panel-muted mt-0.5">Ringkasan performa distribusi pesan</p>
+        </div>
+      </div>
 
-            <div class="form-group">
-              <label>Template Pesan</label>
-              <select id="selectTemplate">
-                <option value="">— Pilih Template —</option>
-              </select>
-            </div>
-            <div id="tplPreviewBox" style="display:none;margin-bottom:14px">
-              <div class="spintax-hint" id="tplPreviewText"></div>
-            </div>
+      <div class="flex items-center gap-2">
+        <button onclick="refreshStats()" class="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 transition-all shadow-sm active:scale-95">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Sinkronisasi</span>
+        </button>
+        <button onclick="confirmLogout()" class="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-red-200 text-xs font-semibold text-red-600 bg-red-50/50 hover:bg-red-50 transition-all active:scale-95">
+          <i data-lucide="log-out" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Disconnect Device</span>
+        </button>
+      </div>
+    </header>
 
-            <div class="form-group">
-              <label>Link Promosi <span style="color:var(--text3)">(mengganti tag <code style="color:var(--green)">[Link]</code>)</span></label>
-              <input type="text" id="targetLink" placeholder="https://wa.me/62xxx"/>
-            </div>
+    <main id="content" class="p-6 max-w-7xl w-full mx-auto flex-1">
 
-            <div class="form-group">
-              <label>File Target <span style="color:var(--text3)">(.txt, satu nomor per baris)</span></label>
-              <div class="dropzone" id="dropzone">
-                <input type="file" id="fileInput" accept=".txt" onchange="onFileSelect(event)"/>
-                <div class="dz-icon">📁</div>
-                <div class="dz-label"><span>Klik</span> atau drag &amp; drop file .txt</div>
-                <div class="dz-file" id="dzFile"></div>
-                <div class="dz-hint">Maks 10 MB · format: 08xx atau 628xx</div>
-              </div>
+      <div id="page-dashboard" class="page active space-y-6">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="bg-white border border-panel-border rounded-2xl p-5 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
+            <div class="flex items-center justify-between">
+              <div class="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600"><i data-lucide="users" class="w-4 h-4"></i></div>
+              <span class="text-[10px] font-mono tracking-widest text-slate-400 uppercase font-bold">Total</span>
             </div>
+            <div id="s-total" class="text-3xl font-bold font-mono text-slate-800 mt-4 tracking-tight transition-transform duration-200">0</div>
+            <p class="text-xs font-medium text-panel-muted mt-1">Database Target</p>
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-slate-300"></div>
+          </div>
+          <div class="bg-white border border-panel-border rounded-2xl p-5 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
+            <div class="flex items-center justify-between">
+              <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center"><i data-lucide="check-circle" class="w-4 h-4"></i></div>
+              <span class="text-[10px] font-mono tracking-widest text-emerald-400 uppercase font-bold">Sent</span>
+            </div>
+            <div id="s-sent" class="text-3xl font-bold font-mono text-emerald-600 mt-4 tracking-tight transition-transform duration-200">0</div>
+            <p class="text-xs font-medium text-panel-muted mt-1">Berhasil Dikirim</p>
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500"></div>
+          </div>
+          <div class="bg-white border border-panel-border rounded-2xl p-5 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
+            <div class="flex items-center justify-between">
+              <div class="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center"><i data-lucide="x-circle" class="w-4 h-4"></i></div>
+              <span class="text-[10px] font-mono tracking-widest text-rose-400 uppercase font-bold">Failed</span>
+            </div>
+            <div id="s-failed" class="text-3xl font-bold font-mono text-rose-600 mt-4 tracking-tight transition-transform duration-200">0</div>
+            <p class="text-xs font-medium text-panel-muted mt-1">Gagal Pengiriman</p>
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-rose-500"></div>
+          </div>
+          <div class="bg-white border border-panel-border rounded-2xl p-5 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
+            <div class="flex items-center justify-between">
+              <div class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center"><i data-lucide="user-minus" class="w-4 h-4"></i></div>
+              <span class="text-[10px] font-mono tracking-widest text-amber-400 uppercase font-bold">Skipped</span>
+            </div>
+            <div id="s-skip" class="text-3xl font-bold font-mono text-amber-500 mt-4 tracking-tight transition-transform duration-200">0</div>
+            <p class="text-xs font-medium text-panel-muted mt-1">Bukan Nomor WA</p>
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-amber-500"></div>
+          </div>
+        </div>
 
-            <button class="btn btn-primary btn-full" id="btnUpload" onclick="uploadKampanye()">
-              ⬆ Upload &amp; Siapkan Antrean
+        <div class="bg-white border border-panel-border rounded-2xl p-6 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2">
+              <span class="w-1 h-3.5 bg-brand-500 rounded-full"></span>
+              <h3 class="text-sm font-bold text-slate-700">Progress Alokasi Pengiriman</h3>
+            </div>
+            <span id="blastStatusPill" class="text-xs font-mono px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 font-bold border border-slate-200">Idle</span>
+          </div>
+          <div class="h-3 w-full bg-slate-100 rounded-full overflow-hidden mb-2 border border-slate-200/50">
+            <div id="progressBar" class="h-full bg-gradient-to-r from-brand-500 to-emerald-400 rounded-full transition-all duration-500 ease-out" style="width: 0%"></div>
+          </div>
+          <div class="flex items-center justify-between text-xs font-mono font-bold text-panel-muted">
+            <span id="progressText">0 / 0 Target</span>
+            <span id="progressPct" class="text-brand-600">0%</span>
+          </div>
+        </div>
+
+        <div class="bg-white border border-panel-border rounded-2xl shadow-sm overflow-hidden">
+          <div class="p-5 border-b border-panel-border flex items-center justify-between bg-slate-50/50">
+            <div class="flex items-center gap-2">
+              <span class="w-1 h-3.5 bg-brand-500 rounded-full"></span>
+              <h3 class="text-sm font-bold text-slate-700">Stream Aktivitas Realtime</h3>
+            </div>
+            <button onclick="clearLog()" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all" title="Bersihkan Log">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
             </button>
           </div>
+          <div class="overflow-x-auto max-h-[420px]">
+            <table class="w-full text-left border-collapse">
+              <thead class="bg-slate-50 text-[10px] font-mono uppercase font-bold text-panel-muted tracking-wider sticky top-0 border-b border-panel-border z-10">
+                <tr>
+                  <th class="py-3 px-6 w-16">Row</th>
+                  <th class="py-3 px-6">Identitas Penerima</th>
+                  <th class="py-3 px-6 w-44">Status Delivery</th>
+                  <th class="py-3 px-6 w-32">Timestamp</th>
+                </tr>
+              </thead>
+              <tbody id="logBody" class="divide-y divide-slate-100 text-sm">
+                <tr>
+                  <td colspan="4" class="py-12">
+                    <div class="flex flex-col items-center justify-center text-panel-muted">
+                      <i data-lucide="inbox" class="w-8 h-8 opacity-40 mb-2"></i>
+                      <p class="text-xs font-medium">Antrean log kosong, silakan unggah data.</p>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
+      </div>
 
-        <!-- KONTROL -->
-        <div style="display:flex;flex-direction:column;gap:16px">
-          <div class="card">
-            <div class="card-title"><div class="card-title-left">Kontrol Blast</div></div>
-            <div style="margin-bottom:14px">
-              <div class="progress-wrap"><div class="progress-bar" id="kProgressBar" style="width:0%"></div></div>
-              <div class="progress-meta">
-                <span id="kProgressText">0 / 0</span>
-                <span id="kProgressPct">0%</span>
+      <div id="page-kampanye" class="page space-y-6">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div class="lg:col-span-7 bg-white border border-panel-border rounded-2xl p-6 shadow-sm space-y-5">
+            <div class="flex items-center gap-2 border-b border-slate-100 pb-3">
+              <i data-lucide="sliders" class="w-4 h-4 text-brand-600"></i>
+              <h3 class="text-sm font-bold text-slate-800">Setup Konfigurasi Kampanye</h3>
+            </div>
+            
+            <div id="alertKampanye" class="p-4 rounded-xl text-xs font-semibold hidden transition-all duration-300"></div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Pilih Template Basis</label>
+              <select id="selectTemplate" class="w-full bg-slate-50 border border-panel-border rounded-xl px-4 py-3 text-sm font-medium focus:border-brand-500 focus:ring-4 focus:ring-brand-glow outline-none transition-all appearance-none cursor-pointer text-slate-700"></select>
+            </div>
+
+            <div id="tplPreviewBox" class="hidden">
+              <div class="bg-slate-50 border border-dashed border-panel-border rounded-xl p-4 text-xs font-mono text-slate-600 whitespace-pre-wrap leading-relaxed"></div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Payload URL / Link Promosi</label>
+              <input type="text" id="targetLink" placeholder="Contoh: https://pansa.my.id/promo" class="w-full bg-slate-50 border border-panel-border rounded-xl px-4 py-3 text-sm font-medium focus:border-brand-500 focus:ring-4 focus:ring-brand-glow outline-none transition-all text-slate-700"/>
+              <p class="text-[11px] text-panel-muted mt-1.5">Sistem otomatis mengganti token <code class="text-brand-600 font-mono font-bold">[Link]</code> dalam teks.</p>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">File Database Target (.txt)</label>
+              <div id="dropzone" class="border-2 border-dashed border-slate-200 bg-slate-50/50 hover:bg-brand-50/20 hover:border-brand-500 rounded-2xl p-8 text-center cursor-pointer transition-all relative group">
+                <input type="file" id="fileInput" accept=".txt" onchange="onFileSelect(event)" class="absolute inset-0 opacity-0 cursor-pointer z-10"/>
+                <i data-lucide="file-up" class="w-8 h-8 text-slate-400 group-hover:text-brand-500 mx-auto mb-2 transition-colors"></i>
+                <p class="text-sm font-bold text-slate-700">Drag &amp; Drop berkas, atau <span class="text-brand-600">Cari File</span></p>
+                <div id="dzFile" class="text-xs font-mono text-brand-600 mt-2 font-bold"></div>
+                <p class="text-[11px] text-panel-muted mt-1">Gunakan pemisah baris baru untuk setiap nomor telepon.</p>
               </div>
             </div>
-            <div style="display:flex;gap:10px">
-              <button class="btn-blast" id="btnBlast" onclick="startBlast()" disabled>
-                ▶ Mulai Blast
+
+            <button id="btnUpload" onclick="uploadKampanye()" class="w-full py-3 px-6 bg-brand-500 hover:bg-brand-600 text-white font-bold text-sm rounded-xl shadow-md shadow-brand-glow transition-all active:scale-[0.99] flex items-center justify-center gap-2">
+              <i data-lucide="upload-cloud" class="w-4 h-4"></i> Sinkronisasi Antrean Database
+            </button>
+          </div>
+
+          <div class="lg:col-span-5 space-y-6">
+            <div class="bg-white border border-panel-border rounded-2xl p-6 shadow-sm space-y-4">
+              <div class="flex items-center gap-2 border-b border-slate-100 pb-3">
+                <i data-lucide="cpu" class="w-4 h-4 text-brand-600"></i>
+                <h3 class="text-sm font-bold text-slate-800">Engine Controller</h3>
+              </div>
+
+              <div>
+                <div class="h-2 w-full bg-slate-100 rounded-full overflow-hidden mb-1.5">
+                  <div id="kProgressBar" class="h-full bg-brand-500 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <div class="flex items-center justify-between text-[11px] font-mono font-bold text-panel-muted">
+                  <span id="kProgressText">0 / 0 Done</span>
+                  <span id="kProgressPct">0%</span>
+                </div>
+              </div>
+
+              <div class="flex gap-3">
+                <button id="btnBlast" onclick="startBlast()" disabled class="flex-1 py-3.5 bg-brand-500 hover:bg-brand-600 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none text-white font-extrabold text-sm rounded-xl shadow-md shadow-brand-glow transition-all active:scale-95 flex items-center justify-center gap-2">
+                  <i data-lucide="play" class="w-4 h-4"></i> Trigger Kirim Pesan
+                </button>
+                <button id="btnStop" onclick="stopBlast()" class="flex-1 py-3.5 bg-rose-500 hover:bg-rose-600 text-white font-extrabold text-sm rounded-xl shadow-md shadow-rose-100 transition-all active:scale-95 hidden items-center justify-center gap-2">
+                  <i data-lucide="square" class="w-4 h-4"></i> Abort Engine
+                </button>
+              </div>
+              <button onclick="resetBlast()" class="w-full py-2 border border-slate-200 hover:bg-slate-50 text-slate-500 font-semibold text-xs rounded-xl transition-all">
+                Wipe Antrean Saat Ini
               </button>
-              <button class="btn btn-stop btn-blast" id="btnStop" style="display:none" onclick="stopBlast()">
-                ⏹ Stop
-              </button>
             </div>
-            <div style="margin-top:10px">
-              <button class="btn btn-ghost btn-sm" onclick="resetBlast()" style="width:100%">🗑 Reset Antrean</button>
+
+            <div class="bg-white border border-panel-border rounded-2xl p-6 shadow-sm flex flex-col h-64 overflow-hidden">
+              <div class="flex items-center gap-2 border-b border-slate-100 pb-2 mb-3">
+                <i data-lucide="terminal" class="w-4 h-4 text-slate-700"></i>
+                <h3 class="text-sm font-bold text-slate-800">System Terminal Logging</h3>
+              </div>
+              <div id="terminal" class="flex-1 bg-slate-900 rounded-xl p-4 font-mono text-[11px] text-slate-300 overflow-y-auto space-y-1.5 selection:bg-slate-700">
+                <div class="flex gap-2"><span class="text-slate-500 shrink-0">--:--:--</span><span class="text-cyan-400">// Ready initialization core core...</span></div>
+              </div>
             </div>
-          </div>
-
-          <div class="card">
-            <div class="card-title"><div class="card-title-left">Terminal Log</div></div>
-            <div class="terminal" id="terminal">
-              <div class="t-line"><span class="t-ts">--:--:--</span><span class="t-msg info">// Sistem siap.</span></div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- ══ PAGE: TEMPLATE ══ -->
-    <div class="page" id="page-template">
-      <div class="g2">
-        <!-- FORM ADD / EDIT -->
-        <div class="card">
-          <div class="card-title">
-            <div class="card-title-left" id="tplFormTitle">Tambah Template</div>
-            <button class="btn-icon" id="btnCancelEdit" style="display:none" onclick="cancelEdit()" title="Batal edit">✕</button>
-          </div>
-          <input type="hidden" id="editTplId"/>
-          <div id="alertTemplate" class="alert"></div>
-          <div class="form-group">
-            <label>Judul Template</label>
-            <input type="text" id="tplTitle" placeholder="cth: Promo Ramadan"/>
-          </div>
-          <div class="form-group">
-            <label>Isi Pesan</label>
-            <textarea id="tplContent" placeholder="Halo [Kak|Bro|Sis], promo spesial tersedia di [Link] 🎉&#10;&#10;Gunakan [A|B|C] untuk spintax — teks acak per pengiriman."></textarea>
-            <div class="form-hint">Support spintax: <code style="color:var(--green)">[A|B|C]</code> · tag link: <code style="color:var(--green)">[Link]</code></div>
-          </div>
-          <div class="spintax-hint" style="margin-bottom:14px">
-            <strong style="color:var(--text2)">Spintax:</strong> Tulis variasi teks dalam kurung siku dipisah <code>|</code><br/>
-            Contoh: <code>[Halo|Hai|Hey] [Kak|Bro|Sis], cek promo di [Link] ya!</code>
-          </div>
-          <button class="btn btn-primary btn-full" id="btnSaveTpl" onclick="saveTemplate()">Simpan Template</button>
-        </div>
-
-        <!-- LIST -->
-        <div class="card">
-          <div class="card-title">
-            <div class="card-title-left">Daftar Template</div>
-            <span id="tplCount" style="font-size:.72rem;color:var(--text3);font-family:var(--mono)">0 item</span>
-          </div>
-          <div class="tpl-list" id="templateList">
-            <div class="empty-state"><div class="icon">📭</div><p>Belum ada template</p></div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- ══ PAGE: KONEKSI WA ══ -->
-    <div class="page" id="page-koneksi">
-      <div class="g2" style="max-width:860px">
-        <div class="card">
-          <div class="card-title"><div class="card-title-left">Pairing WhatsApp</div></div>
-          <div id="alertKoneksi" class="alert"></div>
+      <div id="page-template" class="page space-y-6">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-white border border-panel-border rounded-2xl p-6 shadow-sm space-y-4 h-fit">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div class="flex items-center gap-2">
+                <i data-lucide="file-plus" class="w-4 h-4 text-brand-600"></i>
+                <h3 id="tplFormTitle" class="text-sm font-bold text-slate-800">Simpan Template Baru</h3>
+              </div>
+              <button id="btnCancelEdit" onclick="cancelEdit()" class="hidden text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1">Batal <i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+            </div>
+            
+            <input type="hidden" id="editTplId"/>
+            <div id="alertTemplate" class="p-4 rounded-xl text-xs font-semibold hidden"></div>
 
-          <p style="font-size:.83rem;color:var(--text2);margin-bottom:16px;line-height:1.7">
-            Masukkan nomor WA dengan kode negara (tanpa <code>+</code>).<br/>
-            Setelah dapat kode, buka WA → <strong>Perangkat Tertaut</strong> → <strong>Tautkan Perangkat</strong>.
-          </p>
+            <div>
+              <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Nama / Judul Template</label>
+              <input type="text" id="tplTitle" placeholder="Contoh: Notifikasi Flash Sale" class="w-full bg-slate-50 border border-panel-border rounded-xl px-4 py-3 text-sm font-medium focus:border-brand-500 focus:ring-4 focus:ring-brand-glow outline-none transition-all text-slate-700"/>
+            </div>
 
-          <div class="form-group">
-            <label>Nomor WhatsApp</label>
-            <input type="tel" id="pairPhone" placeholder="628123456789" autocomplete="off"/>
+            <div>
+              <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Konstruksi Konten Teks</label>
+              <textarea id="tplContent" placeholder="Halo [Kak|Gan], promo [Link] khusus hari ini..." class="w-full bg-slate-50 border border-panel-border rounded-xl px-4 py-3 text-sm font-medium focus:border-brand-500 focus:ring-4 focus:ring-brand-glow outline-none transition-all text-slate-700 min-h-[120px] resize-y leading-relaxed"></textarea>
+            </div>
+
+            <div class="bg-slate-50 border border-panel-border rounded-xl p-4 text-xs space-y-1.5 text-panel-muted">
+              <div class="font-bold text-slate-700 flex items-center gap-1.5 mb-1"><i data-lucide="info" class="w-3.5 h-3.5 text-brand-500"></i> Aturan Sintaks &amp; Mekanisme Spintax</div>
+              <p>Gunakan kurung siku dipisah garis tegak untuk pesan acak per target.</p>
+              <p class="font-mono bg-white p-1.5 rounded border border-slate-200 text-[11px] text-slate-600">Format: <span class="text-brand-600 font-bold">[Halo|Hai|Permisi]</span> Kak, temukan diskon di <span class="text-brand-600 font-bold">[Link]</span></p>
+            </div>
+
+            <button id="btnSaveTpl" onclick="saveTemplate()" class="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white font-bold text-sm rounded-xl shadow-sm transition-all active:scale-[0.99]">
+              Simpan ke Kompilasi Template
+            </button>
           </div>
-          <button class="btn btn-primary btn-full" onclick="requestPairing()">📲 Minta Kode Pairing</button>
 
-          <div class="pair-code-box" id="pairCodeBox">
-            <div style="font-size:.75rem;color:var(--text3);margin-bottom:10px;font-family:var(--mono)">KODE PAIRING</div>
-            <div class="pair-code" id="pairCode">——————</div>
-            <div class="pair-hint">
-              Masukkan kode di atas pada aplikasi WhatsApp kamu.<br/>
-              Kode berlaku <strong style="color:var(--yellow)">60 detik</strong>.
+          <div class="bg-white border border-panel-border rounded-2xl p-6 shadow-sm flex flex-col">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <div class="flex items-center gap-2">
+                <i data-lucide="folder-heart" class="w-4 h-4 text-brand-600"></i>
+                <h3 class="text-sm font-bold text-slate-800">Daftar Template Aktif</h3>
+              </div>
+              <span id="tplCount" class="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-500">0 Item</span>
+            </div>
+
+            <div id="templateList" class="space-y-3 max-h-[520px] overflow-y-auto pr-1">
+              <div class="text-center py-12 text-panel-muted">
+                <i data-lucide="folder-open" class="w-8 h-8 opacity-40 mx-auto mb-2"></i>
+                <p class="text-xs">Database template belum dikonfigurasi.</p>
+              </div>
             </div>
           </div>
         </div>
+      </div>
 
-        <div class="card">
-          <div class="card-title"><div class="card-title-left">Status Sesi</div></div>
+      <div id="page-koneksi" class="page space-y-6">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-4xl">
+          <div class="bg-white border border-panel-border rounded-2xl p-6 shadow-sm space-y-4">
+            <div class="flex items-center gap-2 border-b border-slate-100 pb-3">
+              <i data-lucide="link-2" class="w-4 h-4 text-brand-600"></i>
+              <h3 class="text-sm font-bold text-slate-800">Tautkan Perangkat via Nomor</h3>
+            </div>
+            
+            <div id="alertKoneksi" class="p-4 rounded-xl text-xs font-semibold hidden"></div>
+            
+            <p class="text-xs text-panel-muted leading-relaxed">Masukkan kode negara di awal nomor (contoh: <code>628xxxx</code>). Pastikan Anda membuka menu <strong>Perangkat Tertaut</strong> pada aplikasi WhatsApp.</p>
 
-          <div style="display:flex;flex-direction:column;gap:12px">
-            <div class="card card-sm" style="border-color:var(--border2)">
-              <div style="font-size:.75rem;color:var(--text3);margin-bottom:8px;font-family:var(--mono)">STATUS KONEKSI</div>
-              <div style="display:flex;align-items:center;gap:10px">
-                <div class="dot" id="sessDot" style="width:10px;height:10px;border-radius:50%;background:var(--text3)"></div>
-                <div>
-                  <div style="font-weight:600;font-size:.9rem" id="sessStatus">Tidak Terhubung</div>
-                  <div style="font-size:.75rem;color:var(--text3);font-family:var(--mono)" id="sessNum">—</div>
+            <div>
+              <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Nomor WhatsApp Gateway</label>
+              <div class="relative">
+                <input type="tel" id="pairPhone" placeholder="Contoh: 6282322791101" class="w-full bg-slate-50 border border-panel-border rounded-xl pl-10 pr-4 py-3 text-sm font-medium focus:border-brand-500 focus:ring-4 focus:ring-brand-glow outline-none transition-all text-slate-700 font-mono"/>
+                <i data-lucide="phone" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5"></i>
+              </div>
+            </div>
+
+            <button onclick="requestPairing()" class="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white font-bold text-sm rounded-xl shadow-md shadow-brand-glow transition-all active:scale-[0.99] flex items-center justify-center gap-2">
+              <i data-lucide="fingerprint" class="w-4 h-4"></i> Generate Pairing Token
+            </button>
+
+            <div id="pairCodeBox" class="hidden bg-slate-900 text-white border border-slate-800 rounded-xl p-6 text-center shadow-inner relative overflow-hidden group">
+              <div class="text-[10px] font-mono tracking-widest text-slate-400 font-bold uppercase mb-2">Token Autentikasi WhatsApp</div>
+              <div id="pairCode" class="text-3xl font-mono font-bold tracking-[0.3em] text-brand-400 select-all py-2">——————</div>
+              <p class="text-[11px] text-slate-400 mt-2 leading-relaxed">Gunakan token di atas segera sebelum koneksi kedaluwarsa.</p>
+            </div>
+          </div>
+
+          <div class="space-y-4">
+            <div class="bg-white border border-panel-border rounded-2xl p-5 shadow-sm space-y-3">
+              <div class="text-[11px] font-mono tracking-wider font-bold text-slate-400 uppercase">State Sesi Kredensial</div>
+              <div class="flex items-center gap-4 bg-slate-50 border border-panel-border rounded-xl p-4">
+                <div id="sessDot" class="w-3 h-3 rounded-full bg-slate-300 shrink-0"></div>
+                <div class="min-w-0">
+                  <div id="sessStatus" class="font-bold text-sm text-slate-700">Mencari Data...</div>
+                  <div id="sessNum" class="text-xs font-mono text-panel-muted mt-0.5 truncate">—</div>
                 </div>
               </div>
             </div>
 
-            <div class="card card-sm" style="border-color:var(--border2)">
-              <div style="font-size:.75rem;color:var(--text3);margin-bottom:8px;font-family:var(--mono)">AKSI SESI</div>
-              <button class="btn btn-danger btn-full" onclick="confirmLogout()">
-                🔌 Logout &amp; Reset Sesi
+            <div class="bg-white border border-panel-border rounded-2xl p-5 shadow-sm space-y-3">
+              <div class="text-[11px] font-mono tracking-wider font-bold text-slate-400 uppercase">Manajemen Sesi</div>
+              <button onclick="confirmLogout()" class="w-full py-2.5 px-4 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs rounded-xl border border-rose-200 transition-all active:scale-[0.99] flex items-center justify-center gap-2">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Bersihkan Sesi &amp; Hapus Cache Kunci
               </button>
-              <div style="font-size:.72rem;color:var(--text3);margin-top:8px">
-                Menghapus folder auth_info dan melakukan pairing ulang dari awal.
-              </div>
-            </div>
-
-            <div class="card card-sm" style="border-color:var(--border2);background:var(--yellow-dim)">
-              <div style="font-size:.75rem;color:var(--yellow);margin-bottom:6px;font-family:var(--mono)">⚠ CATATAN</div>
-              <div style="font-size:.78rem;color:var(--text2);line-height:1.6">
-                Jangan logout jika blast sedang berjalan. Gunakan fitur Stop Blast terlebih dahulu.
-              </div>
+              <p class="text-[10px] text-panel-muted leading-relaxed">Menghapus file <code>auth_info</code> secara paksa untuk memaksa pembuatan ulang token koneksi baru.</p>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-  </div><!-- /content -->
-</div><!-- /main -->
+    </main>
+  </div>
+</div>
 
-<!-- ══ MODAL KONFIRMASI ══ -->
-<div class="modal-overlay" id="modalOverlay">
-  <div class="modal">
-    <div class="modal-header">
-      <span id="modalTitle">Konfirmasi</span>
-      <button class="modal-close" onclick="closeModal()">✕</button>
+<div id="modalOverlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[999] hidden items-center justify-center p-4 opacity-0 transition-opacity duration-200" onclick="if(event.target===this) closeModal()">
+  <div class="bg-white border border-panel-border rounded-2xl w-full max-w-md shadow-xl overflow-hidden scale-95 transition-transform duration-200">
+    <div class="p-5 border-b border-panel-border flex items-center justify-between bg-slate-50/50">
+      <h4 id="modalTitle" class="font-bold text-slate-800 text-sm">Konfirmasi Tindakan</h4>
+      <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-4 h-4"></i></button>
     </div>
-    <div class="modal-body">
-      <p style="font-size:.88rem;color:var(--text2)" id="modalMsg"></p>
-      <div class="modal-footer">
-        <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
-        <button class="btn btn-danger" id="modalConfirm">Konfirmasi</button>
+    <div class="p-6 space-y-4">
+      <p id="modalMsg" class="text-sm text-slate-600 leading-relaxed"></p>
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button onclick="closeModal()" class="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50 border border-slate-200 rounded-xl transition-all">Batalkan</button>
+        <button id="modalConfirm" class="px-4 py-2 text-xs font-bold text-white bg-rose-500 hover:bg-rose-600 rounded-xl transition-all shadow-sm">Eksekusi</button>
       </div>
     </div>
   </div>
 </div>
 
 <script>
-// ══════════════════════════════════════
-// SOCKET.IO
-// ══════════════════════════════════════
 const socket = io();
-let ST = { total:0, sent:0, failed:0, skip:0 };
+let ST = { total: 0, sent: 0, failed: 0, skip: 0 };
 let rowCount = 0;
+let selectedFile = null;
+const alertTimers = {};
+let _modalCb = null;
 
+// Initialize SVG icons on bootstrap
+document.addEventListener('DOMContentLoaded', () => {
+  lucide.createIcons();
+  setupUIEventListeners();
+  refreshStats();
+});
+
+function setupUIEventListeners() {
+  const sel = document.getElementById('selectTemplate');
+  if (sel) {
+    sel.addEventListener('change', () => {
+      const box = document.getElementById('tplPreviewBox');
+      const innerText = box.querySelector('div');
+      if (sel.value) {
+        box.classList.remove('hidden');
+        innerText.textContent = sel.value;
+      } else {
+        box.classList.add('hidden');
+      }
+    });
+  }
+
+  const dz = document.getElementById('dropzone');
+  if (dz) {
+    dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('bg-brand-50/40', 'border-brand-500'); });
+    dz.addEventListener('dragleave', () => dz.classList.remove('bg-brand-50/40', 'border-brand-500'));
+    dz.addEventListener('drop', e => {
+      e.preventDefault();
+      dz.classList.remove('bg-brand-50/40', 'border-brand-500');
+      const f = e.dataTransfer.files[0];
+      if (f?.name.endsWith('.txt')) { selectedFile = f; document.getElementById('dzFile').textContent = f.name; }
+    });
+  }
+}
+
+// ══════════════════════════════════════
+// SOCKET COMMUNICATIONS HANDLERS
+// ══════════════════════════════════════
 socket.on('wa-status', ({ connected, status, number }) => {
   updateWaUI(connected, status, number);
 });
@@ -880,110 +498,121 @@ socket.on('terminal-log', ({ ts, msg, type }) => {
 });
 
 socket.on('blast-ready', ({ total }) => {
-  ST = { total, sent:0, failed:0, skip:0 };
+  ST = { total, sent: 0, failed: 0, skip: 0 };
   updateStats(); updateProgress();
   document.getElementById('btnBlast').disabled = false;
-  showAlert('alertKampanye', `${total} target siap diblast.`, 'success');
-  addTermLine(now(), `Antrean siap: ${total} target`, 'ok');
+  showAlert('alertKampanye', `${total} target berhasil disinkronisasi ke dalam antrean.`, 'success');
+  addTermLine(now(), `Database dimuat: ${total} entitas siap didistribusikan`, 'ok');
 });
 
 socket.on('blast-started', () => {
-  document.getElementById('btnBlast').style.display = 'none';
-  document.getElementById('btnStop').style.display  = 'flex';
-  document.getElementById('blastStatusPill').innerHTML = '<span style="color:var(--green)">● Berjalan</span>';
+  document.getElementById('btnBlast').classList.add('hidden');
+  document.getElementById('btnStop').classList.remove('hidden');
+  document.getElementById('btnStop').classList.add('flex');
+  document.getElementById('blastStatusPill').className = 'text-xs font-mono px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 font-bold border border-emerald-200';
+  document.getElementById('blastStatusPill').innerHTML = '● Running';
 });
 
 socket.on('blast-update', ({ id, phone_number, status }) => {
   addLogRow(id, phone_number, status);
-  if (status === 'sent')            ST.sent++;
-  else if (status === 'failed')     ST.failed++;
+  if (status === 'sent') ST.sent++;
+  else if (status === 'failed') ST.failed++;
   else if (status === 'not_registered') ST.skip++;
   updateStats(); updateProgress();
 });
 
 socket.on('blast-finished', ({ message }) => {
-  document.getElementById('btnBlast').style.display = 'flex';
-  document.getElementById('btnStop').style.display  = 'none';
+  document.getElementById('btnBlast').classList.remove('hidden');
+  document.getElementById('btnStop').classList.add('hidden');
   document.getElementById('btnBlast').disabled = true;
-  document.getElementById('blastStatusPill').innerHTML = '<span style="color:var(--text3)">Selesai</span>';
+  document.getElementById('blastStatusPill').className = 'text-xs font-mono px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 font-bold border border-slate-200';
+  document.getElementById('blastStatusPill').innerHTML = 'Selesai';
   addTermLine(now(), message, 'ok');
 });
 
 socket.on('blast-state', ({ isBlasting }) => {
   if (isBlasting) {
-    document.getElementById('btnBlast').style.display = 'none';
-    document.getElementById('btnStop').style.display  = 'flex';
+    document.getElementById('btnBlast').classList.add('hidden');
+    document.getElementById('btnStop').classList.remove('hidden');
+    document.getElementById('btnStop').classList.add('flex');
   }
 });
 
 socket.on('blast-reset', () => {
-  ST = { total:0, sent:0, failed:0, skip:0 };
+  ST = { total: 0, sent: 0, failed: 0, skip: 0 };
   updateStats(); updateProgress();
-  document.getElementById('logBody').innerHTML = '<tr><td colspan="4"><div class="empty-state"><div class="icon">📭</div><p>Belum ada data</p></div></td></tr>';
+  document.getElementById('logBody').innerHTML = '<tr><td colspan="4" class="py-12"><div class="flex flex-col items-center justify-center text-panel-muted"><i data-lucide="inbox" class="w-8 h-8 opacity-40 mb-2"></i><p class="text-xs font-medium">Antrean log kosong, silakan unggah data.</p></div></td></tr>';
+  lucide.createIcons();
   rowCount = 0;
   document.getElementById('btnBlast').disabled = true;
-  document.getElementById('blastStatusPill').innerHTML = '<span style="color:var(--text3)">Idle</span>';
+  document.getElementById('blastStatusPill').innerHTML = 'Idle';
 });
 
 // ══════════════════════════════════════
-// WA STATUS UI
+// WA PLATFORM STATUS PIPELINE
 // ══════════════════════════════════════
 function updateWaUI(connected, status, number) {
-  const pill    = document.getElementById('waPill');
-  const label   = document.getElementById('waPillLabel');
-  const numEl   = document.getElementById('waPillNum');
-  const dot     = document.getElementById('sessDot');
-  const sStat   = document.getElementById('sessStatus');
-  const sNum    = document.getElementById('sessNum');
-  const banner  = document.getElementById('reconnect-banner');
+  const pill = document.getElementById('waPill');
+  const dot = document.getElementById('waDot');
+  const label = document.getElementById('waPillLabel');
+  const numEl = document.getElementById('waPillNum');
+  
+  const sDot = document.getElementById('sessDot');
+  const sStat = document.getElementById('sessStatus');
+  const sNum = document.getElementById('sessNum');
+  const banner = document.getElementById('reconnect-banner');
 
-  pill.className = 'wa-pill';
-  banner.classList.remove('show');
+  // Reset modifiers
+  pill.className = "flex items-center gap-3 p-3 rounded-xl border bg-white transition-all duration-300";
+  dot.className = "w-2.5 h-2.5 rounded-full bg-slate-300";
+  sDot.className = "w-3 h-3 rounded-full bg-slate-300 shrink-0";
+  banner.style.display = 'none';
 
   if (connected) {
-    pill.classList.add('connected');
+    pill.classList.add('border-emerald-200', 'bg-emerald-50/30');
+    dot.classList.add('bg-emerald-500', 'shadow-[0_0_8px_rgba(16,185,129,0.6)]');
     label.textContent = 'Terhubung';
+    label.className = "text-xs font-bold text-emerald-700";
     numEl.textContent = number || '—';
-    dot.style.background   = 'var(--green)';
-    dot.style.boxShadow    = '0 0 8px var(--green)';
-    sStat.textContent      = 'Terhubung';
-    sNum.textContent       = number || '—';
+
+    sDot.classList.add('bg-emerald-500', 'shadow-[0_0_8px_rgba(16,185,129,0.6)]');
+    sStat.textContent = 'Terhubung Terotentikasi';
+    sStat.className = "font-bold text-sm text-emerald-700";
+    sNum.textContent = number || '—';
   } else if (status === 'connecting' || status === 'reconnecting') {
-    pill.classList.add('connecting');
-    label.textContent = status === 'reconnecting' ? 'Reconnecting...' : 'Menghubungkan...';
+    pill.classList.add('border-yellow-200', 'bg-yellow-50/30');
+    dot.classList.add('bg-yellow-500', 'pulse-glow');
+    label.textContent = 'Sinkronisasi...';
+    label.className = "text-xs font-bold text-yellow-700";
     numEl.textContent = '—';
-    dot.style.background = 'var(--yellow)';
-    dot.style.boxShadow  = 'none';
-    sStat.textContent = status === 'reconnecting' ? 'Reconnecting...' : 'Menghubungkan...';
-    sNum.textContent  = '—';
-    banner.classList.add('show');
-  } else if (status === 'logged_out') {
-    pill.classList.add('disconnected');
-    label.textContent = 'Logout';
-    numEl.textContent = '—';
-    dot.style.background = 'var(--red)';
-    dot.style.boxShadow  = 'none';
-    sStat.textContent = 'Logout Permanen';
-    sNum.textContent  = '—';
+
+    sDot.classList.add('bg-yellow-500', 'pulse-glow');
+    sStat.textContent = 'Menghubungkan Node...';
+    sStat.className = "font-bold text-sm text-yellow-700";
+    sNum.textContent = '—';
+    banner.style.display = 'flex';
   } else {
-    pill.classList.add('disconnected');
-    label.textContent = 'Terputus';
+    pill.classList.add('border-rose-200', 'bg-rose-50/30');
+    dot.classList.add('bg-rose-500');
+    label.textContent = 'Offline Device';
+    label.className = "text-xs font-bold text-rose-700";
     numEl.textContent = '—';
-    dot.style.background = 'var(--red)';
-    dot.style.boxShadow  = 'none';
-    sStat.textContent = 'Terputus';
-    sNum.textContent  = '—';
+
+    sDot.classList.add('bg-rose-500');
+    sStat.textContent = status === 'logged_out' ? 'Sesi Terhapus (Logout)' : 'Koneksi Terputus';
+    sStat.className = "font-bold text-sm text-rose-700";
+    sNum.textContent = '—';
   }
 }
 
 // ══════════════════════════════════════
-// STATS & PROGRESS
+// TELEMETRY COUNTER SPEED ANIMATOR
 // ══════════════════════════════════════
 function updateStats() {
-  animNum('s-total',  ST.total);
-  animNum('s-sent',   ST.sent);
+  animNum('s-total', ST.total);
+  animNum('s-sent', ST.sent);
   animNum('s-failed', ST.failed);
-  animNum('s-skip',   ST.skip);
+  animNum('s-skip', ST.skip);
 }
 
 function animNum(id, val) {
@@ -991,91 +620,99 @@ function animNum(id, val) {
   const prev = parseInt(el.textContent) || 0;
   if (prev === val) return;
   el.textContent = val;
-  el.style.transform = 'scale(1.12)';
-  setTimeout(() => el.style.transform = '', 200);
+  el.classList.add('scale-110', 'text-brand-500');
+  setTimeout(() => el.classList.remove('scale-110', 'text-brand-500'), 250);
 }
 
 function updateProgress() {
   const done = ST.sent + ST.failed + ST.skip;
-  const pct  = ST.total ? Math.round(done / ST.total * 100) : 0;
-  const txt  = `${done} / ${ST.total}`;
+  const pct = ST.total ? Math.round(done / ST.total * 100) : 0;
+  const txt = `${done} / ${ST.total} Kontak`;
 
-  ['progressBar','kProgressBar'].forEach(id => {
+  ['progressBar', 'kProgressBar'].forEach(id => {
     document.getElementById(id).style.width = pct + '%';
   });
-  document.getElementById('progressText').textContent  = txt;
-  document.getElementById('progressPct').textContent   = pct + '%';
+  document.getElementById('progressText').textContent = txt;
+  document.getElementById('progressPct').textContent = pct + '%';
   document.getElementById('kProgressText').textContent = txt;
-  document.getElementById('kProgressPct').textContent  = pct + '%';
+  document.getElementById('kProgressPct').textContent = pct + '%';
 }
 
 // ══════════════════════════════════════
-// LOG TABLE
+// DATA LOG RENDERING PIPELINE
 // ══════════════════════════════════════
 function addLogRow(id, phone, status) {
   const tbody = document.getElementById('logBody');
-  // Hapus empty state
   const empty = tbody.querySelector('td[colspan]');
   if (empty) tbody.innerHTML = '';
   rowCount++;
 
   const map = {
-    sent:           ['pill-sent',   'TERKIRIM'],
-    failed:         ['pill-failed', 'GAGAL'],
-    not_registered: ['pill-skip',   'TIDAK WA'],
-    pending:        ['pill-pending','PENDING'],
+    sent: ['bg-emerald-50 text-emerald-700 border-emerald-200', 'TERKIRIM'],
+    failed: ['bg-rose-50 text-rose-700 border-rose-200', 'GAGAL'],
+    not_registered: ['bg-amber-50 text-amber-700 border-amber-200', 'BUKAN WA'],
+    pending: ['bg-slate-50 text-slate-600 border-slate-200', 'PENDING'],
   };
-  const [cls, label] = map[status] || ['pill-pending', status.toUpperCase()];
+  const [cls, label] = map[status] || ['bg-slate-50 text-slate-600 border-slate-200', status.toUpperCase()];
   const ts = new Date().toLocaleTimeString('id-ID');
 
   const tr = document.createElement('tr');
-  tr.className = 'new-row';
+  tr.className = 'new-row border-b border-slate-100 hover:bg-slate-50/50 transition-colors';
   tr.innerHTML = `
-    <td class="mono" style="color:var(--text3)">${rowCount}</td>
-    <td class="mono">${esc(phone)}</td>
-    <td><span class="pill ${cls}"><span class="pill-dot"></span>${label}</span></td>
-    <td style="color:var(--text3);font-size:.78rem">${ts}</td>
+    <td class="py-3 px-6 font-mono text-xs text-slate-400">${rowCount}</td>
+    <td class="py-3 px-6 font-mono font-medium text-slate-700">${esc(phone)}</td>
+    <td class="py-3 px-6"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${cls}">${label}</span></td>
+    <td class="py-3 px-6 font-mono text-xs text-slate-400">${ts}</td>
   `;
   tbody.insertBefore(tr, tbody.firstChild);
 }
 
 function clearLog() {
-  document.getElementById('logBody').innerHTML =
-    '<tr><td colspan="4"><div class="empty-state"><div class="icon">📭</div><p>Belum ada data</p></div></td></tr>';
+  document.getElementById('logBody').innerHTML = '<tr><td colspan="4" class="py-12"><div class="flex flex-col items-center justify-center text-panel-muted"><i data-lucide="inbox" class="w-8 h-8 opacity-40 mb-2"></i><p class="text-xs font-medium">Antrean log kosong, silakan unggah data.</p></div></td></tr>';
+  lucide.createIcons();
   rowCount = 0;
 }
 
-// ══════════════════════════════════════
-// TERMINAL
-// ══════════════════════════════════════
 function addTermLine(ts, msg, type) {
-  const t  = document.getElementById('terminal');
+  const t = document.getElementById('terminal');
   const el = document.createElement('div');
-  el.className = 't-line';
-  el.innerHTML = `<span class="t-ts">${ts}</span><span class="t-msg ${type}">${esc(msg)}</span>`;
+  el.className = 'flex gap-2';
+  
+  const typeMap = {
+    ok: 'text-emerald-400',
+    err: 'text-rose-400',
+    warn: 'text-amber-400',
+    info: 'text-slate-400'
+  };
+  const cls = typeMap[type] || 'text-slate-300';
+
+  el.innerHTML = `<span class="text-slate-500 shrink-0 select-none">${ts}</span><span class="${cls}">${esc(msg)}</span>`;
   t.appendChild(el);
   t.scrollTop = t.scrollHeight;
 }
 
 // ══════════════════════════════════════
-// NAVIGATION
+// ROUTER NAVIGATION STRATEGY
 // ══════════════════════════════════════
 const PAGE_META = {
-  dashboard: ['Dashboard',   'Overview kampanye blast'],
-  kampanye:  ['Kampanye',    'Upload & jalankan blast'],
-  template:  ['Template',    'Kelola template pesan'],
-  koneksi:   ['Koneksi WA',  'Pairing & status sesi'],
+  dashboard: ['Dashboard Overview', 'Ringkasan performa distribusi pesan'],
+  kampanye: ['Management Kampanye', 'Upload database target & jalankan pengiriman massal'],
+  template: ['Kompilasi Template', 'Kelola repositori data teks dinamis spintax'],
+  koneksi: ['Integrasi Device', 'Konfigurasi sinkronisasi token gateway WhatsApp'],
 };
 
 function nav(el, name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => {
+    n.classList.remove('active', 'bg-brand-50', 'text-brand-600', 'border-brand-500/20');
+  });
+  
   document.getElementById('page-' + name).classList.add('active');
-  el.classList.add('active');
+  el.classList.add('active', 'bg-brand-50', 'text-brand-600', 'border-brand-500/20');
 
   const [title, sub] = PAGE_META[name] || [name, ''];
   document.getElementById('topTitle').textContent = title;
-  document.getElementById('topSub').textContent   = sub;
+  document.getElementById('topSub').textContent = sub;
 
   if (name === 'kampanye') loadTemplateOptions();
   if (name === 'template') loadTemplates();
@@ -1083,85 +720,93 @@ function nav(el, name) {
   closeSidebar();
 }
 
-// ══════════════════════════════════════
-// SIDEBAR MOBILE
-// ══════════════════════════════════════
 function toggleSidebar() {
-  document.getElementById('sidebar').classList.toggle('open');
-  document.getElementById('sb-overlay').classList.toggle('open');
+  const sb = document.getElementById('sidebar');
+  const overlay = document.getElementById('sb-overlay');
+  sb.classList.toggle('-translate-x-full');
+  overlay.classList.toggle('hidden');
+  setTimeout(() => overlay.classList.toggle('opacity-100'), 50);
 }
+
 function closeSidebar() {
-  document.getElementById('sidebar').classList.remove('open');
-  document.getElementById('sb-overlay').classList.remove('open');
+  const sb = document.getElementById('sidebar');
+  const overlay = document.getElementById('sb-overlay');
+  sb.classList.add('-translate-x-full');
+  overlay.classList.remove('opacity-100');
+  setTimeout(() => overlay.classList.add('hidden'), 300);
 }
 
 // ══════════════════════════════════════
-// PAIRING
+// DATA LOGIC TRANSMISSION LAYERS
 // ══════════════════════════════════════
 async function requestPairing() {
   const phone = document.getElementById('pairPhone').value.trim();
-  if (!phone) return showAlert('alertKoneksi', 'Masukkan nomor WA.', 'error');
+  if (!phone) return showAlert('alertKoneksi', 'Nomor identitas wajib diisi.', 'error');
   try {
-    const res  = await api('/api/request-pairing', 'POST', { phone });
+    const res = await api('/api/request-pairing', 'POST', { phone });
     if (res.code) {
-      document.getElementById('pairCodeBox').style.display = 'block';
+      document.getElementById('pairCodeBox').classList.remove('hidden');
       document.getElementById('pairCode').textContent = res.code;
+      showAlert('alertKoneksi', 'Token pairing berhasil di-generate.', 'success');
     } else {
-      showAlert('alertKoneksi', res.message || 'Request terkirim.', 'success');
+      showAlert('alertKoneksi', res.message || 'Permintaan diproses server.', 'success');
     }
   } catch (e) { showAlert('alertKoneksi', e.message, 'error'); }
 }
 
 function confirmLogout() {
-  openModal('Logout WhatsApp', 'Yakin ingin logout dan menghapus sesi? Kamu perlu pairing ulang.', async () => {
+  openModal('Tutus Jaringan Sesi', 'Apakah Anda yakin ingin mematikan koneksi gateway dan menghapus seluruh cache enkripsi? Anda harus menautkan perangkat kembali.', async () => {
     try {
       await api('/api/logout', 'POST');
-      showAlert('alertKoneksi', 'Sesi dihapus. Silakan pairing ulang.', 'warn');
+      showAlert('alertKoneksi', 'Kredensial dibersihkan dari penyimpanan.', 'warn');
     } catch (e) { showAlert('alertKoneksi', e.message, 'error'); }
   });
 }
 
 // ══════════════════════════════════════
-// TEMPLATE
+// TEMPLATE STORAGE INTERACTIONS
 // ══════════════════════════════════════
 async function loadTemplates() {
   const data = await api('/api/templates');
   const list = document.getElementById('templateList');
-  document.getElementById('tplCount').textContent = data.length + ' item';
+  document.getElementById('tplCount').textContent = data.length + ' Item';
 
   if (!data.length) {
-    list.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>Belum ada template</p></div>';
+    list.innerHTML = '<div class="text-center py-12 text-panel-muted"><i data-lucide="folder-open" class="w-8 h-8 opacity-40 mx-auto mb-2"></i><p class="text-xs">Database template belum dikonfigurasi.</p></div>';
+    lucide.createIcons();
     return;
   }
+  
   list.innerHTML = data.map(t => `
-    <div class="tpl-card">
-      <div class="tpl-card-body">
-        <div class="tpl-card-title">${esc(t.title)}</div>
-        <div class="tpl-card-preview">${esc(t.content)}</div>
+    <div class="bg-slate-50 border border-panel-border rounded-xl p-4 flex items-start gap-4 transition-all hover:bg-white hover:shadow-sm">
+      <div class="flex-1 min-w-0">
+        <h4 class="font-bold text-slate-800 text-sm truncate">${esc(t.title)}</h4>
+        <p class="text-xs text-panel-muted font-mono truncate mt-1">${esc(t.content)}</p>
       </div>
-      <div class="tpl-card-actions">
-        <button class="btn-icon" onclick="editTemplate(${t.id},'${b64(t.title)}','${b64(t.content)}')" title="Edit">✏️</button>
-        <button class="btn-icon" onclick="deleteTpl(${t.id})" title="Hapus" style="color:var(--red)">🗑</button>
+      <div class="flex items-center gap-1 shrink-0">
+        <button class="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-white rounded-lg border border-transparent hover:border-slate-200" onclick="editTemplate(${t.id},'${b64(t.title)}','${b64(t.content)}')" title="Edit"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button>
+        <button class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-white rounded-lg border border-transparent hover:border-slate-200" onclick="deleteTpl(${t.id})" title="Hapus"><i data-lucide="trash" class="w-3.5 h-3.5"></i></button>
       </div>
     </div>
   `).join('');
+  lucide.createIcons();
 }
 
 async function saveTemplate() {
-  const id      = document.getElementById('editTplId').value;
-  const title   = document.getElementById('tplTitle').value.trim();
+  const id = document.getElementById('editTplId').value;
+  const title = document.getElementById('tplTitle').value.trim();
   const content = document.getElementById('tplContent').value.trim();
-  if (!title || !content) return showAlert('alertTemplate', 'Judul dan isi wajib diisi.', 'error');
+  if (!title || !content) return showAlert('alertTemplate', 'Seluruh kolom form wajib diisi.', 'error');
 
   try {
     if (id) {
       await api('/api/templates/' + id, 'PUT', { title, content });
-      showAlert('alertTemplate', 'Template diperbarui.', 'success');
+      showAlert('alertTemplate', 'Modifikasi template berhasil disimpan.', 'success');
       cancelEdit();
     } else {
       await api('/api/templates', 'POST', { title, content });
-      showAlert('alertTemplate', 'Template disimpan.', 'success');
-      document.getElementById('tplTitle').value   = '';
+      showAlert('alertTemplate', 'Konstruksi template baru berhasil ditambahkan.', 'success');
+      document.getElementById('tplTitle').value = '';
       document.getElementById('tplContent').value = '';
     }
     loadTemplates();
@@ -1169,26 +814,26 @@ async function saveTemplate() {
 }
 
 function editTemplate(id, titleB64, contentB64) {
-  document.getElementById('editTplId').value    = id;
-  document.getElementById('tplTitle').value     = atob(titleB64);
-  document.getElementById('tplContent').value   = atob(contentB64);
-  document.getElementById('tplFormTitle').textContent = 'Edit Template';
-  document.getElementById('btnSaveTpl').textContent   = 'Update Template';
-  document.getElementById('btnCancelEdit').style.display = 'inline-flex';
-  document.querySelector('#page-template .card').scrollIntoView({ behavior:'smooth' });
+  document.getElementById('editTplId').value = id;
+  document.getElementById('tplTitle').value = atob(titleB64);
+  document.getElementById('tplContent').value = atob(contentB64);
+  document.getElementById('tplFormTitle').textContent = 'Ubah Konstruksi Template';
+  document.getElementById('btnSaveTpl').textContent = 'Perbarui Data Template';
+  document.getElementById('btnCancelEdit').classList.remove('hidden');
+  document.querySelector('#page-template').scrollTop = 0;
 }
 
 function cancelEdit() {
-  document.getElementById('editTplId').value    = '';
-  document.getElementById('tplTitle').value     = '';
-  document.getElementById('tplContent').value   = '';
-  document.getElementById('tplFormTitle').textContent = 'Tambah Template';
-  document.getElementById('btnSaveTpl').textContent   = 'Simpan Template';
-  document.getElementById('btnCancelEdit').style.display = 'none';
+  document.getElementById('editTplId').value = '';
+  document.getElementById('tplTitle').value = '';
+  document.getElementById('tplContent').value = '';
+  document.getElementById('tplFormTitle').textContent = 'Simpan Template Baru';
+  document.getElementById('btnSaveTpl').textContent = 'Simpan ke Kompilasi Template';
+  document.getElementById('btnCancelEdit').classList.add('hidden');
 }
 
 function deleteTpl(id) {
-  openModal('Hapus Template', 'Template ini akan dihapus permanen.', async () => {
+  openModal('Hapus File Template', 'Apakah Anda yakin ingin membuang template data ini secara permanen dari database storage?', async () => {
     await api('/api/templates/' + id, 'DELETE');
     loadTemplates();
   });
@@ -1196,8 +841,8 @@ function deleteTpl(id) {
 
 async function loadTemplateOptions() {
   const data = await api('/api/templates');
-  const sel  = document.getElementById('selectTemplate');
-  sel.innerHTML = '<option value="">— Pilih Template —</option>';
+  const sel = document.getElementById('selectTemplate');
+  sel.innerHTML = '<option value="">— Silakan Pilih Struktur Template —</option>';
   data.forEach(t => {
     const o = document.createElement('option');
     o.value = t.content; o.textContent = t.title;
@@ -1205,59 +850,23 @@ async function loadTemplateOptions() {
   });
 }
 
-document.getElementById && (() => {
-  // Preview template saat dipilih
-  const sel = document.getElementById('selectTemplate');
-  if (sel) sel.addEventListener('change', () => {
-    const box  = document.getElementById('tplPreviewBox');
-    const text = document.getElementById('tplPreviewText');
-    if (sel.value) {
-      box.style.display = 'block';
-      text.textContent  = sel.value;
-    } else {
-      box.style.display = 'none';
-    }
-  });
-})();
-
 // ══════════════════════════════════════
-// UPLOAD & BLAST
+// BULK CAMPAIGN SCHEDULERS ENGINE
 // ══════════════════════════════════════
-let selectedFile = null;
-
-document.addEventListener('DOMContentLoaded', () => {
-  const sel = document.getElementById('selectTemplate');
-  sel.addEventListener('change', () => {
-    const box  = document.getElementById('tplPreviewBox');
-    const text = document.getElementById('tplPreviewText');
-    if (sel.value) { box.style.display = 'block'; text.textContent = sel.value; }
-    else box.style.display = 'none';
-  });
-
-  const dz = document.getElementById('dropzone');
-  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
-  dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
-  dz.addEventListener('drop', e => {
-    e.preventDefault(); dz.classList.remove('drag');
-    const f = e.dataTransfer.files[0];
-    if (f?.name.endsWith('.txt')) { selectedFile = f; document.getElementById('dzFile').textContent = f.name; }
-  });
-});
-
 function onFileSelect(e) {
   selectedFile = e.target.files[0];
-  document.getElementById('dzFile').textContent = selectedFile?.name || '';
+  document.getElementById('dzFile').textContent = selectedFile ? `Terpilih: ${selectedFile.name}` : '';
 }
 
 async function uploadKampanye() {
-  const tpl  = document.getElementById('selectTemplate').value;
+  const tpl = document.getElementById('selectTemplate').value;
   const link = document.getElementById('targetLink').value.trim();
-  if (!tpl)         return showAlert('alertKampanye', 'Pilih template terlebih dahulu.', 'error');
-  if (!link)        return showAlert('alertKampanye', 'Masukkan link promosi.', 'error');
-  if (!selectedFile) return showAlert('alertKampanye', 'Pilih file .txt target.', 'error');
+  if (!tpl) return showAlert('alertKampanye', 'Struktur pola template pesan belum dipilih.', 'error');
+  if (!link) return showAlert('alertKampanye', 'Payload URL promosi wajib dilampirkan.', 'error');
+  if (!selectedFile) return showAlert('alertKampanye', 'Berkas basis data nomor (.txt) tidak ditemukan.', 'error');
 
   const btn = document.getElementById('btnUpload');
-  btn.disabled = true; btn.textContent = 'Mengupload...';
+  btn.disabled = true; btn.textContent = 'Menyinkronkan Komponen Data...';
 
   const fd = new FormData();
   fd.append('file', selectedFile);
@@ -1265,28 +874,33 @@ async function uploadKampanye() {
   fd.append('targetLink', link);
 
   try {
-    const res = await fetch('/api/upload-targets', { method:'POST', body: fd });
-    const d   = await res.json();
+    const res = await fetch('/api/upload-targets', { method: 'POST', body: fd });
+    const d = await res.json();
     if (d.success) {
-      showAlert('alertKampanye', `${d.total} target berhasil dimuat ke antrean.`, 'success');
+      showAlert('alertKampanye', `${d.total} record data dimuat ke runtime buffer.`, 'success');
     } else { showAlert('alertKampanye', d.error, 'error'); }
-  } catch { showAlert('alertKampanye', 'Upload gagal.', 'error'); }
+  } catch { showAlert('alertKampanye', 'Proses transfer data gagal.', 'error'); }
 
-  btn.disabled = false; btn.textContent = '⬆ Upload & Siapkan Antrean';
+  btn.disabled = false; btn.innerHTML = '<i data-lucide="upload-cloud" class="w-4 h-4"></i> Sinkronisasi Antrean Database';
+  lucide.createIcons();
 }
 
 async function startBlast() {
   try {
     const d = await api('/api/start-blast', 'POST');
     if (d.success) {
-      addTermLine(now(), 'Mesin blast diaktifkan...', 'ok');
-      // switch ke dashboard
+      addTermLine(now(), 'Menginisialisasi core blast engine...', 'ok');
+      
+      // Route internally to dashboard screen view
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active', 'bg-brand-50', 'text-brand-600'));
+      
       document.getElementById('page-dashboard').classList.add('active');
-      document.querySelector('[data-page="dashboard"]').classList.add('active');
-      document.getElementById('topTitle').textContent = 'Dashboard';
-      document.getElementById('topSub').textContent   = 'Overview kampanye blast';
+      const targetNav = document.querySelector('[data-page="dashboard"]');
+      targetNav.classList.add('active', 'bg-brand-50', 'text-brand-600');
+      
+      document.getElementById('topTitle').textContent = PAGE_META.dashboard[0];
+      document.getElementById('topSub').textContent = PAGE_META.dashboard[1];
     } else { showAlert('alertKampanye', d.error || d.message, 'error'); }
   } catch (e) { showAlert('alertKampanye', e.message, 'error'); }
 }
@@ -1294,12 +908,12 @@ async function startBlast() {
 async function stopBlast() {
   try {
     await api('/api/stop-blast', 'POST');
-    addTermLine(now(), 'Sinyal stop dikirim.', 'warn');
+    addTermLine(now(), 'Sinyal interupsi paksa dikirim ke core engine.', 'warn');
   } catch (e) { console.error(e); }
 }
 
 async function resetBlast() {
-  openModal('Reset Antrean', 'Semua data target blast akan dihapus.', async () => {
+  openModal('Wipe Data Buffer Kampanye', 'Tindakan ini menghapus seluruh antrean data target pengiriman yang tersimpan.', async () => {
     try { await api('/api/reset-blast', 'POST'); }
     catch (e) { showAlert('alertKampanye', e.message, 'error'); }
   });
@@ -1308,10 +922,10 @@ async function resetBlast() {
 async function refreshStats() {
   try {
     const d = await api('/api/stats');
-    ST.total   = Number(d.total)   || 0;
-    ST.sent    = Number(d.sent)    || 0;
-    ST.failed  = Number(d.failed)  || 0;
-    ST.skip    = Number(d.skipped) || 0;
+    ST.total = Number(d.total) || 0;
+    ST.sent = Number(d.sent) || 0;
+    ST.failed = Number(d.failed) || 0;
+    ST.skip = Number(d.skipped) || 0;
     updateStats(); updateProgress();
 
     const rows = await api('/api/blast-targets');
@@ -1320,62 +934,72 @@ async function refreshStats() {
       rowCount = 0;
       rows.slice().reverse().forEach(r => addLogRow(r.id, r.phone_number, r.status));
     }
-  } catch (e) { console.error('refresh stats error:', e); }
+  } catch (e) { console.error('Gagal sinkronisasi data dashboard:', e); }
 }
 
 // ══════════════════════════════════════
-// MODAL
+// MODAL & AMBIENT OVERLAYS CONTROLLERS
 // ══════════════════════════════════════
-let _modalCb = null;
 function openModal(title, msg, cb) {
   document.getElementById('modalTitle').textContent = title;
-  document.getElementById('modalMsg').textContent   = msg;
-  document.getElementById('modalOverlay').classList.add('open');
+  document.getElementById('modalMsg').textContent = msg;
+  
+  const m = document.getElementById('modalOverlay');
+  m.classList.remove('hidden');
+  m.classList.add('flex');
+  setTimeout(() => {
+    m.classList.add('opacity-100');
+    m.querySelector('div').classList.remove('scale-95', 'translate-y-4');
+  }, 5);
   _modalCb = cb;
   document.getElementById('modalConfirm').onclick = () => { closeModal(); _modalCb && _modalCb(); };
 }
+
 function closeModal() {
-  document.getElementById('modalOverlay').classList.remove('open');
+  const m = document.getElementById('modalOverlay');
+  m.classList.remove('opacity-100');
+  m.querySelector('div').classList.add('scale-95');
+  setTimeout(() => {
+    m.classList.remove('flex');
+    m.classList.add('hidden');
+  }, 200);
   _modalCb = null;
 }
-document.getElementById('modalOverlay').addEventListener('click', e => {
-  if (e.target === document.getElementById('modalOverlay')) closeModal();
-});
 
 // ══════════════════════════════════════
-// ALERT
+// INTERACTIVE UTILITY HELPERS
 // ══════════════════════════════════════
-const alertTimers = {};
 function showAlert(id, msg, type = 'success') {
   const el = document.getElementById(id);
   if (!el) return;
   if (alertTimers[id]) clearTimeout(alertTimers[id]);
+  
   el.textContent = msg;
-  el.className   = `alert show alert-${type}`;
-  alertTimers[id] = setTimeout(() => el.classList.remove('show'), 4500);
+  el.className = "p-4 rounded-xl text-xs font-semibold block transition-all duration-300 ";
+  
+  if (type === 'success') el.classList.add('bg-emerald-50', 'text-emerald-700', 'border', 'border-emerald-200');
+  else if (type === 'error') el.classList.add('bg-rose-50', 'text-rose-700', 'border', 'border-rose-200');
+  else el.classList.add('bg-amber-50', 'text-amber-700', 'border', 'border-amber-200');
+
+  alertTimers[id] = setTimeout(() => {
+    el.className = "hidden";
+  }, 5000);
 }
 
-// ══════════════════════════════════════
-// HELPERS
-// ══════════════════════════════════════
 async function api(url, method = 'GET', body) {
   const opts = { method, headers: {} };
   if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
-  const res  = await fetch(url, opts);
+  const res = await fetch(url, opts);
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Request gagal');
+  if (!res.ok) throw new Error(data.error || 'Network transaction transmission error');
   return data;
 }
 
 function esc(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-
 function b64(str) { return btoa(unescape(encodeURIComponent(str))); }
-function now()    { return new Date().toLocaleTimeString('id-ID'); }
-
-// ── Init load stats ──────────────────
-refreshStats();
+function now() { return new Date().toLocaleTimeString('id-ID'); }
 </script>
 </body>
 </html>
