@@ -49,7 +49,7 @@ let reconnectTimer = null;
 let reconnectCount = 0;
 const MAX_RECONNECT = 999; // reconnect terus selama proses berjalan
 
-const log = pino({ level: 'silent' }); // silent — semua log via console + socket
+const log = pino({ level: 'silent' }); // semua log diarahkan ke console + socket secara kustom
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ═══════════════════════════════════════════════════
@@ -73,7 +73,7 @@ function emitLog(msg, type = 'info') {
 }
 
 // ═══════════════════════════════════════════════════
-// INISIALISASI BAILEYS — AUTO RECONNECT
+// INISIALISASI BAILEYS — AUTO RECONNECT + AUTO RESET TIMEOUT
 // ═══════════════════════════════════════════════════
 async function initWhatsApp() {
     try {
@@ -91,19 +91,23 @@ async function initWhatsApp() {
             logger:           log,
             printQRInTerminal: false,
             browser:          ['PANSA BLASTER', 'Chrome', '120.0'],
-            connectTimeoutMs:  30_000,
-            defaultQueryTimeoutMs: 20_000,
+            
+            // Tweak Stabilitas Sesi & Anti-Timeout Awal
+            connectTimeoutMs:       60_000, 
+            defaultQueryTimeoutMs:  60_000,
+            keepAliveIntervalMs:    10_000, // Ping lebih agresif ke server WA agar tidak idle
+            syncFullHistory:        false,  // Mencegah penumpukan beban data chat masuk yang berat
+            
             retryRequestDelayMs:    2_000,
             maxMsgRetryCount:       3,
-            keepAliveIntervalMs:   15_000,
-            markOnlineOnConnect:   false,
+            markOnlineOnConnect:    false,
             shouldIgnoreJid: jid => isJidBroadcast(jid),
         });
 
-        // ── Simpan kredensial setiap update ──────────
+        // Simpan kredensial setiap kali ada pembaruan state
         sock.ev.on('creds.update', saveCreds);
 
-        // ── Handler koneksi ──────────────────────────
+        // Handler status koneksi
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect } = update;
 
@@ -128,23 +132,38 @@ async function initWhatsApp() {
                 emitLog(`Koneksi terputus. Code: ${statusCode} — ${reason}`, 'warn');
                 io.emit('wa-status', { connected: false, status: 'disconnected' });
 
-                // LOGOUT PERMANEN → tidak reconnect, minta pairing ulang
+                // 1. HANDLER JIKA LOGOUT PERMANEN
                 if (statusCode === DisconnectReason.loggedOut) {
                     emitLog('Sesi logout permanen. Hapus folder auth_info untuk login ulang.', 'err');
                     io.emit('wa-status', { connected: false, status: 'logged_out' });
                     return;
                 }
 
-                // Stream error / konflik sesi → reconnect segera
+                // 2. AUTOMATIC RE-GENERATE JIKA TIMEOUT SAAT PROSES PAIRING
+                const isBelumLogin = !sock?.authState?.creds?.me;
+                if (isBelumLogin && (statusCode === 428 || statusCode === 408 || reason.includes('Timed Out'))) {
+                    emitLog('Pairing timeout atau koneksi di-terminate server WA. Mereset sisa sesi...', 'warn');
+                    
+                    try { sock?.ws?.close(); } catch(_) {}
+                    
+                    // Hapus folder auth_info kotor agar siap digunakan kembali dari nol
+                    fs.rmSync('auth_info', { recursive: true, force: true });
+                    io.emit('wa-status', { connected: false, status: 'logged_out' });
+                    
+                    emitLog('Sistem siap menerima request pairing baru dalam 3 detik.', 'info');
+                    setTimeout(initWhatsApp, 3000);
+                    return; 
+                }
+
                 if (statusCode === DisconnectReason.connectionReplaced) {
                     emitLog('Sesi digantikan perangkat lain.', 'warn');
                 }
 
+                // Jalankan proses reconnect berkala jika akun memang sudah ter-pairing sebelumnya
                 scheduleReconnect();
             }
         });
 
-        // ── Abaikan event pesan (tidak perlu diproses) ──
         sock.ev.on('messages.upsert', () => {});
 
     } catch (err) {
@@ -153,9 +172,16 @@ async function initWhatsApp() {
     }
 }
 
-// ── Jadwalkan reconnect dengan backoff eksponensial ──
+// ── Jadwalkan reconnect dengan backoff eksponensial (Hanya untuk nomor yang sudah login) ──
 function scheduleReconnect() {
     if (reconnectTimer) clearTimeout(reconnectTimer);
+    
+    // Proteksi: Jika nomor belum login, jangan membanjiri looping reconnect
+    if (!sock?.authState?.creds?.me) {
+        emitLog('Sesi kosong / belum ter-pairing. Menunggu trigger pairing baru dari dashboard.', 'info');
+        return;
+    }
+
     if (reconnectCount >= MAX_RECONNECT) {
         emitLog('Batas maksimum reconnect tercapai.', 'err');
         return;
@@ -191,7 +217,7 @@ app.post('/api/request-pairing', async (req, res) => {
     if (!phone) return res.status(400).json({ error: 'Nomor wajib diisi' });
 
     try {
-        // Validasi state socket yang lebih ketat untuk mencegah tabrakan sesi
+        // Validasi state socket yang ketat untuk mencegah tabrakan sesi aktif
         if (isConnected || sock?.authState?.creds?.me) {
             return res.json({ message: 'WhatsApp sudah terhubung.' });
         }
@@ -199,19 +225,19 @@ app.post('/api/request-pairing', async (req, res) => {
             return res.status(503).json({ error: 'Socket belum siap, silakan tunggu sebentar.' });
         }
 
-        // Pembersihan format nomor
+        // Normalisasi format nomor tujuan
         const clean = phone.replace(/[^0-9]/g, '');
         if (clean.length < 8) return res.status(400).json({ error: 'Nomor WhatsApp tidak valid' });
 
         emitLog(`Meminta pairing code untuk nomor ${clean}...`, 'info');
 
-        // Delay 1.5 detik sangat krusial di Baileys untuk memastikan node siap
+        // Jeda waktu krusial untuk memastikan node Baileys siap melakukan transaksi data stream
         await delay(1500);
 
-        // Request pairing code ke server WA
+        // Eksekusi request pairing code ke server WA
         let code = await sock.requestPairingCode(clean);
 
-        // Format kode menjadi XXXX-XXXX jika belum diformat oleh Baileys
+        // Format string kode menjadi format standar visual WA (XXXX-XXXX) jika masih polos
         code = code?.replace(/-/g, '')?.match(/.{1,4}/g)?.join('-') || code;
 
         emitLog(`Pairing code berhasil didapat: ${code}`, 'ok');
@@ -220,18 +246,15 @@ app.post('/api/request-pairing', async (req, res) => {
     } catch (err) {
         emitLog(`Pairing error: ${err.message}`, 'err');
 
-        // Tangani error spesifik dari server WhatsApp / Baileys
         const errMsg = err.message || '';
-        
         if (errMsg.includes('rate-overlimit') || errMsg.includes('429')) {
-            return res.status(429).json({ error: 'Terlalu banyak permintaan. Tunggu beberapa menit sebelum mencoba lagi.' });
+            return res.status(429).json({ error: 'Terlahu banyak permintaan kode. Silakan tunggu beberapa menit.' });
         } 
-        
         if (errMsg.includes('Connection Closed') || errMsg.includes('timeout')) {
             return res.status(503).json({ error: 'Koneksi ke server WhatsApp tidak stabil. Silakan coba lagi.' });
         }
 
-        res.status(500).json({ error: 'Gagal mendapatkan pairing code. Pastikan nomor benar dan terdaftar di WhatsApp.' });
+        res.status(500).json({ error: 'Gagal mendapatkan pairing code. Pastikan nomor terdaftar di WA.' });
     }
 });
 
@@ -356,7 +379,7 @@ app.get('/api/stats', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════
-// API: LOG ANTREAN (hydrate saat refresh)
+// API: LOG ANTREAN (Hydrate saat dashboard direfresh)
 // ═══════════════════════════════════════════════════
 app.get('/api/blast-targets', async (req, res) => {
     try {
@@ -393,7 +416,7 @@ async function startBlastEngine() {
         for (const target of targets) {
             if (stopFlag) { emitLog('Blast dihentikan manual.', 'warn'); break; }
 
-            // Tunggu reconnect jika WA sempat putus (maks 60 detik)
+            // Tunggu reconnect jika WA mendadak terputus di tengah proses blast (maks 60s)
             if (!isConnected) {
                 emitLog('WA terputus, menunggu reconnect...', 'warn');
                 let waited = 0;
@@ -419,6 +442,7 @@ async function startBlastEngine() {
                     const msg = parseSpintax(target.message);
                     await sock.sendMessage(jid, { text: msg });
                     status = 'sent';
+                    // Delay random anti-banned (12 - 25 detik)
                     waitMs = Math.floor(Math.random() * (25000 - 12000 + 1)) + 12000;
                 }
             } catch (err) {
@@ -480,10 +504,9 @@ app.post('/api/reset-blast', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════
-// SOCKET.IO — HANDSHAKE
+// SOCKET.IO — HANDSHAKE STATE
 // ═══════════════════════════════════════════════════
 io.on('connection', (socket) => {
-    // Kirim state saat ini ke client baru
     const number = sock?.user?.id?.split(':')[0] || null;
     socket.emit('wa-status', {
         connected: isConnected,
@@ -494,7 +517,7 @@ io.on('connection', (socket) => {
 });
 
 // ═══════════════════════════════════════════════════
-// BOOT
+// BOOT SERVER
 // ═══════════════════════════════════════════════════
 const PORT = process.env.PORT || 3000;
 
