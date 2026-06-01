@@ -7,6 +7,7 @@ const {
     fetchLatestBaileysVersion,
     makeCacheableSignalKeyStore,
     isJidBroadcast,
+    Browsers // Impor utilitas Browser standar bawaan Baileys
 } = require('@whiskeysockets/baileys');
 
 const express  = require('express');
@@ -64,7 +65,7 @@ function parseSpintax(text) {
 }
 
 // ═══════════════════════════════════════════════════
-// MULTI-SESSION INSTANCE INITIALIZER (FIXED CORE)
+// MULTI-SESSION INSTANCE INITIALIZER (STANDARDIZED)
 // ═══════════════════════════════════════════════════
 async function initWhatsApp(sessionId) {
     if (sessions[sessionId] && sessions[sessionId].connected) return sessions[sessionId];
@@ -85,7 +86,10 @@ async function initWhatsApp(sessionId) {
             },
             logger: log,
             printQRInTerminal: false,
-            browser: ['PANSA GROUP', 'Safari', '18.0'],
+            
+            // FIX MUTAKHIR: Menggunakan format standar emulasi perangkat macOS Chrome resmi Baileys
+            browser: Browsers.macOS('Chrome'),
+            
             connectTimeoutMs: 60_000,
             defaultQueryTimeoutMs: 60_000,
             keepAliveIntervalMs: 15_000,
@@ -93,7 +97,6 @@ async function initWhatsApp(sessionId) {
             markOnlineOnConnect: true
         });
 
-        // Daftarkan/perbarui referensi di runtime storage memory
         sessions[sessionId] = {
             sock,
             connected: false,
@@ -148,7 +151,7 @@ async function initWhatsApp(sessionId) {
                     return;
                 }
 
-                // 2. AUTOMATIC CLEAN RE-GENERATE UNTUK PAIRING TIMEOUT (ERROR 428 / 408)
+                // 2. AUTOMATIC CLEAN RE-GENERATE UNTUK PAIRING/QR TIMEOUT (ERROR 428 / 408)
                 const isBelumLogin = !sock?.authState?.creds?.me;
                 if (isBelumLogin && (statusCode === 428 || statusCode === 408 || reason.includes('Timed Out'))) {
                     emitLog(`Proses pairing/QR pada [${sessionId}] kedaluwarsa. Menutup node secara aman...`, 'warn');
@@ -180,7 +183,6 @@ async function initWhatsApp(sessionId) {
                     }
                     setTimeout(() => initWhatsApp(sessionId), delayReconnect);
                 } else {
-                    // Pengaman sekunder jika terputus saat belum login dengan status kode selain 428/408
                     try { sock.ev.removeAllListeners('connection.update'); sock.end(); } catch(_) {}
                     if (fs.existsSync(sessionPath)) fs.rmSync(sessionPath, { recursive: true, force: true });
                     delete sessions[sessionId];
@@ -207,10 +209,9 @@ function loadExistingSessions() {
 }
 
 // ═══════════════════════════════════════════════════
-// SYSTEM REST API ENDPOINTS
+// REST API ENDPOINTS
 // ═══════════════════════════════════════════════════
 
-// Core Render Shell SPA
 app.get('/', async (req, res) => {
     try {
         const [templates] = await pool.query('SELECT * FROM templates ORDER BY id DESC');
@@ -220,7 +221,6 @@ app.get('/', async (req, res) => {
     }
 });
 
-// Device Session Manager API
 app.get('/api/wa-sessions', (req, res) => {
     const list = Object.keys(sessions).map(id => ({
         sessionId: id,
@@ -252,7 +252,7 @@ app.post('/api/request-pairing', async (req, res) => {
         code = code?.replace(/-/g, '')?.match(/.{1,4}/g)?.join('-') || code;
         res.json({ code });
     } catch (err) { 
-        res.status(500).json({ error: 'Gagal menembak server Meta. Batas limit terlampaui.' }); 
+        res.status(500).json({ error: 'Gagal mendapatkan pairing code. Kemungkinan batas limit tercapai.' }); 
     }
 });
 
@@ -277,7 +277,6 @@ app.post('/api/logout', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Template CRUD API
 app.get('/api/templates', async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT * FROM templates ORDER BY id DESC');
@@ -310,7 +309,6 @@ app.delete('/api/templates/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Campaign Queue Systems API
 app.post('/api/upload-targets', upload.single('file'), async (req, res) => {
     const { messageTemplate, targetLink } = req.body;
     if (!req.file || !messageTemplate || !targetLink) return res.status(400).json({ error: 'Payload tidak lengkap.' });
@@ -373,7 +371,6 @@ async function startBlastEngine() {
         for (const target of targets) {
             if (stopFlag) { emitLog('Engine diinterupsi oleh admin.', 'warn'); break; }
 
-            // Cari alokasi device yang siap secara acak (Load Balancing antar instansi)
             const activeSessions = Object.values(sessions).filter(s => s.connected);
             if (!activeSessions.length) {
                 emitLog('Tidak ada device WhatsApp yang aktif terhubung. Loop ditahan...', 'warn');
@@ -394,7 +391,7 @@ async function startBlastEngine() {
                     const msg = parseSpintax(target.message);
                     await activeNode.sock.sendMessage(jid, { text: msg });
                     status = 'sent';
-                    waitMs = Math.floor(Math.random() * (22000 - 12000 + 1)) + 12000; // Anti-Banned delay 12-22s
+                    waitMs = Math.floor(Math.random() * (22000 - 12000 + 1)) + 12000; 
                 }
             } catch (err) {
                 status = 'failed';
