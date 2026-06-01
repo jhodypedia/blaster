@@ -17,8 +17,27 @@
   tailwind.config = {
     theme: {
       extend: {
-        fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'], mono: ['"JetBrains Mono"', 'monospace'] },
-        colors: { brand: { 50: '#f0fdf4', 100: '#dcfce7', 500: '#10b981', 600: '#059669' }, panel: { bg: '#f8fafc', card: '#ffffff', border: '#e2e8f0', text: '#0f172a', muted: '#64748b' } }
+        fontFamily: {
+          sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          mono: ['"JetBrains Mono"', 'monospace'],
+        },
+        colors: {
+          brand: {
+            50: '#f0fdf4',
+            100: '#dcfce7',
+            500: '#10b981',
+            600: '#059669',
+            700: '#047857',
+            glow: 'rgba(16, 185, 129, 0.15)'
+          },
+          panel: {
+            bg: '#f8fafc',
+            card: '#ffffff',
+            border: '#e2e8f0',
+            text: '#0f172a',
+            muted: '#64748b'
+          }
+        }
       }
     }
   }
@@ -26,35 +45,54 @@
 
 <style>
   ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; }
+  ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
   .page { display: none; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
   .page.active { display: block; }
-  @keyframes slideUp { from { opacity: 0; transform: translateY(16px); backdrop-filter: blur(0px); } to { opacity: 1; transform: translateY(0); backdrop-filter: blur(4px); } }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  
   .pulse-glow { animation: pulseGlow 2s infinite ease-in-out; }
   @keyframes pulseGlow { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); } 50% { opacity: 0.6; box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); } }
+  
+  @keyframes rowFlash { 0% { background-color: rgba(16, 185, 129, 0.15); } 100% { background-color: transparent; } }
+  .new-row { animation: rowFlash 0.8s ease-out forwards; }
 </style>
 </head>
-<body class="bg-panel-bg text-panel-text font-sans min-h-screen antialiased">
+<body class="bg-panel-bg text-panel-text font-sans min-h-screen antialiased selection:bg-brand-100">
 
 <div id="global-loader" class="fixed inset-0 bg-white/70 backdrop-blur-md z-[9999] hidden items-center justify-center flex-col gap-4 transition-all duration-200 opacity-0">
   <div class="w-12 h-12 border-4 border-slate-200 border-t-brand-500 rounded-full animate-spin"></div>
-  <p class="text-xs font-bold text-slate-700 font-mono tracking-widest uppercase">Executing Network Task...</p>
+  <p class="text-sm font-bold text-slate-700 font-mono tracking-widest uppercase">Executing Network Task...</p>
 </div>
 
 <div id="sb-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[199] hidden transition-all duration-300 opacity-0" onclick="closeSidebar()"></div>
 
 <div id="shell" class="flex min-h-screen">
+  
   <aside id="sidebar" class="w-64 bg-white border-r border-panel-border flex flex-col fixed top-0 bottom-0 left-0 z-[200] transition-transform duration-300 -translate-x-full md:translate-x-0 shadow-sm">
     <div class="p-6 border-b border-panel-border flex items-center gap-3">
       <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-500 to-emerald-400 flex items-center justify-center text-white font-bold text-lg shadow-md shadow-brand-glow">P</div>
-      <div><div class="font-extrabold text-sm tracking-tight text-slate-800">PANSA GROUP</div><div class="text-[10px] font-mono text-panel-muted tracking-wider uppercase">Engine Platform</div></div>
+      <div>
+        <div class="font-extrabold text-sm tracking-tight text-slate-800">PANSA GROUP</div>
+        <div class="text-[10px] font-mono text-panel-muted tracking-wider uppercase">Engine Platform</div>
+      </div>
     </div>
     <div class="text-[10px] font-mono font-bold uppercase tracking-widest text-slate-400 px-6 pt-6 pb-2">Menu Navigasi</div>
     <nav class="flex-1 px-4 flex flex-col gap-1">
-      <button onclick="nav(this,'dashboard')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-brand-600 bg-brand-50 border border-transparent transition-all active"><i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard Console</button>
-      <button onclick="nav(this,'kampanye')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-panel-muted border border-transparent transition-all"><i data-lucide="rocket" class="w-4 h-4"></i> Eksekusi Kampanye</button>
-      <button onclick="nav(this,'template')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-panel-muted border border-transparent transition-all"><i data-lucide="file-text" class="w-4 h-4"></i> Kelola Template</button>
-      <button onclick="nav(this,'koneksi')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-panel-muted border border-transparent transition-all"><i data-lucide="smartphone" class="w-4 h-4"></i> Integrasi Device</button>
+      <button onclick="nav(this,'dashboard')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-brand-600 bg-brand-50 border border-transparent transition-all active">
+        <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard Console
+      </button>
+      <button onclick="nav(this,'kampanye')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-panel-muted border border-transparent transition-all">
+        <i data-lucide="rocket" class="w-4 h-4"></i> Eksekusi Kampanye
+      </button>
+      <button onclick="nav(this,'template')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-panel-muted border border-transparent transition-all">
+        <i data-lucide="file-text" class="w-4 h-4"></i> Kelola Template
+      </button>
+      <button onclick="nav(this,'koneksi')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-panel-muted border border-transparent transition-all">
+        <i data-lucide="smartphone" class="w-4 h-4"></i> Integrasi Device
+      </button>
     </nav>
   </aside>
 
@@ -62,7 +100,10 @@
     <header class="h-16 border-b border-panel-border bg-white/80 backdrop-blur-md sticky top-0 z-[100] px-6 flex items-center justify-between shadow-sm">
       <div class="flex items-center gap-4">
         <button onclick="toggleSidebar()" class="md:hidden p-2 rounded-lg text-panel-muted hover:bg-slate-100"><i data-lucide="menu" class="w-5 h-5"></i></button>
-        <div><h1 id="topTitle" class="font-bold text-base text-slate-800">Dashboard Console</h1><p id="topSub" class="text-xs text-panel-muted">Ringkasan performa kluster sistem</p></div>
+        <div>
+          <h1 id="topTitle" class="font-bold text-base text-slate-800">Dashboard Console</h1>
+          <p id="topSub" class="text-xs text-panel-muted">Ringkasan performa kluster sistem</p>
+        </div>
       </div>
     </header>
 
@@ -222,18 +263,34 @@
         <button id="m-btn-qr" onclick="toggleModalMethod('qr')" class="flex-1 py-2 text-xs font-bold rounded-lg bg-white shadow-sm text-slate-800 transition-all">Scan QR Code</button>
         <button id="m-btn-pairing" onclick="toggleModalMethod('pairing')" class="flex-1 py-2 text-xs font-semibold rounded-lg text-panel-muted hover:text-slate-800 transition-all">Pairing Code</button>
       </div>
+      
       <div id="m-pane-qr" class="flex flex-col items-center justify-center py-4 space-y-3">
         <div id="modal-qrcode" class="p-3 bg-white border rounded-xl shadow-inner min-h-[200px] min-w-[200px] flex items-center justify-center"></div>
         <p class="text-xs text-panel-muted font-mono" id="qr-modal-placeholder">Menunggu String Matrix Server...</p>
       </div>
+      
       <div id="m-pane-pairing" class="hidden space-y-4">
         <div>
           <label class="block text-xs font-bold text-slate-600 uppercase mb-2">Nomor Telepon Gateway</label>
-          <input type="tel" id="m-pair-phone" placeholder="Contoh: 6282322791101" class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-mono outline-none"/>
+          <input type="tel" id="m-pair-phone" placeholder="Contoh: 6282322791101" class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-mono outline-none focus:border-brand-500"/>
         </div>
-        <button onclick="submitPairingRequest()" class="w-full py-2.5 bg-brand-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2"><i data-lucide="fingerprint" class="w-4 h-4"></i> Generate Pairing Token</button>
-        <div id="m-pair-box" class="hidden bg-slate-900 text-white rounded-xl p-5 text-center font-mono">
-          <div id="m-pair-code" class="text-2xl font-bold tracking-[0.25em] text-brand-400 select-all">——————</div>
+        
+        <button id="btnSubmitPairing" onclick="submitPairingRequest()" class="w-full py-2.5 bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98]">
+          <span id="textSubmitPairing" class="flex items-center gap-2">
+            <i data-lucide="fingerprint" class="w-4 h-4"></i> Generate Pairing Token
+          </span>
+          <span id="spinnerSubmitPairing" class="hidden items-center gap-2 font-mono uppercase tracking-wider text-[11px]">
+            <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Generating Token...
+          </span>
+        </button>
+        
+        <div id="m-pair-box" class="hidden bg-slate-900 text-white border border-slate-800 rounded-xl p-5 text-center font-mono relative overflow-hidden group">
+          <div class="text-[9px] text-slate-400 font-bold uppercase mb-1">Pairing Code Token Meta</div>
+          <div id="m-pair-code" class="text-2xl font-bold tracking-[0.25em] text-brand-400 select-all py-1">——————</div>
         </div>
       </div>
     </div>
@@ -329,6 +386,7 @@ function openConnectWizard(sessionId) {
   document.getElementById('m-pair-box').classList.add('hidden');
   document.getElementById('m-pair-phone').value = '';
   document.getElementById('qr-modal-placeholder').style.display = 'block';
+  document.getElementById('qr-modal-placeholder').textContent = 'Menunggu String Matrix Server...';
   
   const m = document.getElementById('connectModal');
   m.classList.remove('hidden'); m.classList.add('flex');
@@ -358,13 +416,39 @@ function toggleModalMethod(method) {
   }
 }
 
+// REQUEST PAIRING CODE DENGAN OVERLOAD INTERNAL BUTTON SPINNER LOADING
 async function submitPairingRequest() {
   const phone = document.getElementById('m-pair-phone').value.trim();
   if(!phone) return;
-  const res = await api('/api/request-pairing', 'POST', { sessionId: currentModalSessionId, phone });
-  if(res.code) {
-    document.getElementById('m-pair-box').classList.remove('hidden');
-    document.getElementById('m-pair-code').textContent = res.code;
+
+  const btn = document.getElementById('btnSubmitPairing');
+  const textLabel = document.getElementById('textSubmitPairing');
+  const spinnerLabel = document.getElementById('spinnerSubmitPairing');
+
+  // Lock state tombol pairing & tampilkan spinner loading internal
+  btn.disabled = true;
+  btn.classList.add('bg-brand-600', 'cursor-not-allowed');
+  textLabel.classList.add('hidden');
+  spinnerLabel.classList.remove('hidden');
+  spinnerLabel.classList.add('flex');
+
+  try {
+    const res = await api('/api/request-pairing', 'POST', { sessionId: currentModalSessionId, phone });
+    if(res.code) {
+      document.getElementById('m-pair-box').classList.remove('hidden');
+      document.getElementById('m-pair-code').textContent = res.code;
+    } else if (res.error) {
+      alert("Error: " + res.error);
+    }
+  } catch (err) {
+    console.error(err);
+  } finally {
+    // Kembalikan state tombol pairing ke posisi normal
+    btn.disabled = false;
+    btn.classList.remove('bg-brand-600', 'cursor-not-allowed');
+    textLabel.classList.remove('hidden');
+    spinnerLabel.classList.add('hidden');
+    spinnerLabel.classList.remove('flex');
   }
 }
 
