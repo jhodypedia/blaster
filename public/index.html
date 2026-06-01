@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise Real-time WA Blast Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans min-h-screen p-8">
+
+    <div class="max-w-6xl mx-auto space-y-6">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 flex justify-between items-center shadow-lg">
+            <div>
+                <h1 class="text-2xl font-bold text-white tracking-wide">PANSA GROUP — SYSTEM AUTO DISTRIBUTION</h1>
+                <p class="text-sm text-slate-400 mt-1">Manajemen Kampanye, Rotasi Basis Data Template & Validasi Global Real-time</p>
+            </div>
+            <div id="status-badge" class="px-4 py-2 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/30 transition-all">
+                WhatsApp: Terputus
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <div class="space-y-6">
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 space-y-4 shadow-md">
+                    <h2 class="text-md font-semibold text-white border-b border-slate-700 pb-2 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-indigo-500"></span> 1. Perangkat Pengirim
+                    </h2>
+                    <div class="space-y-2">
+                        <input type="text" id="sender-phone" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500" placeholder="Nomor tanpa + (Contoh: 62812xxx)">
+                        <button onclick="requestPairing()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm py-2 rounded-lg transition">Minta Kode Pairing</button>
+                    </div>
+                    <div id="pairing-display" class="hidden text-center bg-slate-900 border border-dashed border-indigo-500/40 p-4 rounded-lg">
+                        <p class="text-xs text-slate-400">MASUKKAN KODE INI DI WA PONSEL:</p>
+                        <p id="pairing-code" class="text-2xl font-mono font-bold text-indigo-400 tracking-widest mt-1">-</p>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 space-y-4 shadow-md">
+                    <h2 class="text-md font-semibold text-white border-b border-slate-700 pb-2 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-purple-500"></span> Simpan Template Baru ke DB
+                    </h2>
+                    <div class="space-y-3">
+                        <input type="text" id="new-template-title" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-purple-500" placeholder="Judul / Nama Template">
+                        <textarea id="new-template-content" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-purple-500 text-xs" placeholder="Isi teks template spintax... Gunakan tag [Link]"></textarea>
+                        <button onclick="saveTemplateToDB()" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-medium text-sm py-2 rounded-lg transition">Simpan ke Database</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 space-y-4 shadow-md lg:col-span-2">
+                <h2 class="text-md font-semibold text-white border-b border-slate-700 pb-2 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 2. Konfigurasi Kampanye & Rotasi Template
+                </h2>
+                <form id="upload-form" onsubmit="uploadCampaign(event)" class="space-y-4">
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs text-slate-400 block">Pilih / Rotate Template (Dari DB)</label>
+                            <button type="button" onclick="deleteSelectedTemplate()" class="text-xs text-red-400 hover:underline">Hapus Template Ini</button>
+                        </div>
+                        <select id="template-rotator" onchange="onTemplateSelectChange()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500 cursor-pointer">
+                            </select>
+                    </div>
+
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">Isi Pesan Aktif Saat Ini (Dapat diedit manual sebelum upload)</label>
+                        <textarea id="msg-template" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500 font-mono text-xs" required></textarea>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-xs text-slate-400 block mb-1">Target Tautan Promosi (Smartlink / Gateway Anda)</label>
+                            <input type="url" id="target-link" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500" placeholder="https://pansa.my.id/secure-gateway" required>
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400 block mb-1">Pilih File Target (.txt)</label>
+                            <input type="file" id="target-file" accept=".txt" class="w-full text-sm text-slate-400 file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-700 file:text-slate-200 hover:file:bg-slate-600 cursor-pointer" required>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-3 pt-2">
+                        <button type="submit" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm py-2 rounded-lg transition shadow-md">Upload & Kunci Antrean</button>
+                        <button type="button" onclick="startBlast()" id="btn-start" class="flex-1 bg-slate-700 text-slate-400 font-medium text-sm py-2 rounded-lg cursor-not-allowed transition" disabled>Mulai Distribusi Massal</button>
+                    </div>
+                </form>
+            </div>
+
+        </div>
+
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 shadow-md">
+            <h2 class="text-md font-semibold text-white border-b border-slate-700 pb-3 mb-4 flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-blue-500"></span> 3. Aliran Monitoring Validasi Target & Distribusi Real-time
+            </h2>
+            <div class="overflow-x-auto max-h-80 overflow-y-auto">
+                <table class="w-full text-left text-sm text-slate-300">
+                    <thead class="bg-slate-900 text-slate-400 text-xs uppercase tracking-wider sticky top-0">
+                        <tr>
+                            <th class="py-3 px-4">Nomor Penerima</th>
+                            <th class="py-3 px-4">Status Transmisi</th>
+                            <th class="py-3 px-4">Keterangan Mesin Otomatisasi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="log-table-body" class="divide-y divide-slate-700 font-mono text-xs">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let globalTemplates = [];
+
+        // Memuat Semua Template dari Database Saat Halaman Terbuka
+        document.addEventListener("DOMContentLoaded", () => {
+            loadTemplatesFromDB();
+        });
+
+        async function loadTemplatesFromDB() {
+            try {
+                const response = await fetch('/api/templates');
+                const data = await response.json();
+                globalTemplates = data;
+                
+                const select = document.getElementById('template-rotator');
+                select.innerHTML = '';
+                
+                data.forEach((tpl, index) => {
+                    const opt = document.createElement('option');
+                    opt.value = tpl.id;
+                    opt.innerText = tpl.title;
+                    if(index === 0) opt.setAttribute('selected', 'true');
+                    select.appendChild(opt);
+                });
+
+                if(data.length > 0) {
+                    document.getElementById('msg-template').value = data[0].content;
+                } else {
+                    document.getElementById('msg-template').value = '';
+                }
+            } catch (err) {
+                console.error("Gagal mengambil data template dari database MySQL", err);
+            }
+        }
+
+        function onTemplateSelectChange() {
+            const selectedId = document.getElementById('template-rotator').value;
+            const found = globalTemplates.find(t => t.id == selectedId);
+            if(found) {
+                document.getElementById('msg-template').value = found.content;
+            }
+        }
+
+        async function saveTemplateToDB() {
+            const title = document.getElementById('new-template-title').value;
+            const content = document.getElementById('new-template-content').value;
+            if(!title || !content) return alert('Lengkapi judul dan konten template!');
+
+            const response = await fetch('/api/templates', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, content })
+            });
+            const data = await response.json();
+            if(data.success) {
+                alert('Template berhasil disimpan ke basis data MySQL!');
+                document.getElementById('new-template-title').value = '';
+                document.getElementById('new-template-content').value = '';
+                loadTemplatesFromDB();
+            }
+        }
+
+        async function deleteSelectedTemplate() {
+            const selectedId = document.getElementById('template-rotator').value;
+            if(!selectedId) return alert('Tidak ada template yang dipilih');
+            if(!confirm('Apakah Anda yakin ingin menghapus template ini dari database?')) return;
+
+            const response = await fetch(`/api/templates/${selectedId}`, { method: 'DELETE' });
+            const data = await response.json();
+            if(data.success) {
+                alert('Template berhasil dihapus!');
+                loadTemplatesFromDB();
+            }
+        }
+
+        // WebSockets: Status Koneksi WhatsApp Perangkat
+        socket.on('wa-status', (data) => {
+            const badge = document.getElementById('status-badge');
+            if(data.connected) {
+                badge.className = "px-4 py-2 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-sm";
+                badge.innerText = `Terhubung: ${data.number}`;
+            } else {
+                badge.className = "px-4 py-2 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/30";
+                badge.innerText = "WhatsApp: Terputus";
+            }
+        });
+
+        // WebSockets: File Target Selesai Diparsing Berhasil
+        socket.on('blast-ready', (data) => {
+            const btn = document.getElementById('btn-start');
+            btn.className = "flex-1 bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm py-2 rounded-lg transition shadow-md";
+            btn.removeAttribute('disabled');
+            alert(`Sistem Berhasil Mengunci ${data.total} Nomor Antrean Target.`);
+        });
+
+        // WebSockets: Streaming Update Progress Log Transmisi
+        socket.on('blast-update', (data) => {
+            const tbody = document.getElementById('log-table-body');
+            const row = document.createElement('tr');
+            row.className = "hover:bg-slate-700/40 transition";
+            
+            let statusStyle = '';
+            let desc = '';
+
+            if (data.status === 'sent') {
+                statusStyle = 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20';
+                desc = 'Pesan berhasil terkirim ke pengguna WhatsApp global aktif.';
+            } else if (data.status === 'not_registered') {
+                statusStyle = 'text-amber-400 bg-amber-500/10 border border-amber-500/20';
+                desc = 'Bypass otomatis (Nomor target tidak terdaftar di ekosistem WhatsApp).';
+            } else {
+                statusStyle = 'text-red-400 bg-red-500/10 border border-red-500/20';
+                desc = 'Transmisi terputus (Masalah handshake enkripsi / jaringan).';
+            }
+
+            row.innerHTML = `
+                <td class="py-3 px-4 text-sm font-semibold tracking-wide">${data.phone_number}</td>
+                <td class="py-3 px-4">
+                    <span class="px-2 py-1 rounded text-xs font-bold uppercase ${statusStyle}">${data.status}</span>
+                </td>
+                <td class="py-3 px-4 text-slate-400">${desc}</td>
+            `;
+            tbody.insertBefore(row, tbody.firstChild);
+        });
+
+        socket.on('blast-finished', (data) => {
+            alert(data.message);
+            const btn = document.getElementById('btn-start');
+            btn.className = "flex-1 bg-slate-700 text-slate-400 font-medium text-sm py-2 rounded-lg cursor-not-allowed transition";
+            btn.setAttribute('disabled', 'true');
+        });
+
+        // Request Kode Pairing dari Dashboard
+        async function requestPairing() {
+            const phone = document.getElementById('sender-phone').value;
+            if(!phone) return alert('Isi nomor ponsel pengirim terlebih dahulu!');
+            
+            const response = await fetch('/api/request-pairing', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone })
+            });
+            const data = await response.json();
+            if(data.code) {
+                document.getElementById('pairing-display').classList.remove('hidden');
+                document.getElementById('pairing-code').innerText = data.code;
+            } else {
+                alert(data.message || data.error);
+            }
+        }
+
+        // Upload Berkas Kampanye Aktif
+        async function uploadCampaign(e) {
+            e.preventDefault();
+            const fileInput = document.getElementById('target-file').files[0];
+            const messageTemplate = document.getElementById('msg-template').value;
+            const targetLink = document.getElementById('target-link').value;
+            
+            const formData = new FormData();
+            formData.append('file', fileInput);
+            formData.append('messageTemplate', messageTemplate);
+            formData.append('targetLink', targetLink);
+
+            const response = await fetch('/api/upload-targets', { method: 'POST', body: formData });
+            const data = await response.json();
+            if(data.error) alert(data.error);
+        }
+
+        // Jalankan Mesin Eksekusi Blast
+        async function startBlast() {
+            document.getElementById('log-table-body').innerHTML = '';
+            await fetch('/api/start-blast', { method: 'POST' });
+        }
+    </script>
+</body>
+</html>
