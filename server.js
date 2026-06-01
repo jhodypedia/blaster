@@ -105,7 +105,7 @@ async function initWhatsApp() {
 
         // ── Handler koneksi ──────────────────────────
         sock.ev.on('connection.update', async (update) => {
-            const { connection, lastDisconnect, qr } = update;
+            const { connection, lastDisconnect } = update;
 
             if (connection === 'connecting') {
                 emitLog('Menghubungkan ke WhatsApp...', 'info');
@@ -184,25 +184,54 @@ app.get('/api/wa-status', (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════
-// API: REQUEST PAIRING CODE
+// API: REQUEST PAIRING CODE (STABILIZED)
 // ═══════════════════════════════════════════════════
 app.post('/api/request-pairing', async (req, res) => {
     const { phone } = req.body;
     if (!phone) return res.status(400).json({ error: 'Nomor wajib diisi' });
 
     try {
-        if (isConnected) return res.json({ message: 'Sudah terhubung' });
-        if (!sock)        return res.status(503).json({ error: 'Socket belum siap, tunggu sebentar.' });
+        // Validasi state socket yang lebih ketat untuk mencegah tabrakan sesi
+        if (isConnected || sock?.authState?.creds?.me) {
+            return res.json({ message: 'WhatsApp sudah terhubung.' });
+        }
+        if (!sock) {
+            return res.status(503).json({ error: 'Socket belum siap, silakan tunggu sebentar.' });
+        }
 
+        // Pembersihan format nomor
         const clean = phone.replace(/[^0-9]/g, '');
-        if (clean.length < 8) return res.status(400).json({ error: 'Nomor tidak valid' });
+        if (clean.length < 8) return res.status(400).json({ error: 'Nomor WhatsApp tidak valid' });
 
-        const code = await sock.requestPairingCode(clean);
-        emitLog(`Pairing code dikirim untuk ${clean}`, 'ok');
+        emitLog(`Meminta pairing code untuk nomor ${clean}...`, 'info');
+
+        // Delay 1.5 detik sangat krusial di Baileys untuk memastikan node siap
+        await delay(1500);
+
+        // Request pairing code ke server WA
+        let code = await sock.requestPairingCode(clean);
+
+        // Format kode menjadi XXXX-XXXX jika belum diformat oleh Baileys
+        code = code?.replace(/-/g, '')?.match(/.{1,4}/g)?.join('-') || code;
+
+        emitLog(`Pairing code berhasil didapat: ${code}`, 'ok');
         res.json({ code });
+
     } catch (err) {
         emitLog(`Pairing error: ${err.message}`, 'err');
-        res.status(500).json({ error: err.message });
+
+        // Tangani error spesifik dari server WhatsApp / Baileys
+        const errMsg = err.message || '';
+        
+        if (errMsg.includes('rate-overlimit') || errMsg.includes('429')) {
+            return res.status(429).json({ error: 'Terlalu banyak permintaan. Tunggu beberapa menit sebelum mencoba lagi.' });
+        } 
+        
+        if (errMsg.includes('Connection Closed') || errMsg.includes('timeout')) {
+            return res.status(503).json({ error: 'Koneksi ke server WhatsApp tidak stabil. Silakan coba lagi.' });
+        }
+
+        res.status(500).json({ error: 'Gagal mendapatkan pairing code. Pastikan nomor benar dan terdaftar di WhatsApp.' });
     }
 });
 
