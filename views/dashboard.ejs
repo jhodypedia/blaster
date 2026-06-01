@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>PANSA GROUP — Gateway Core Dashboard</title>
 
+<!-- PREMIUM CDN TOOLKIT -->
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
@@ -17,27 +18,8 @@
   tailwind.config = {
     theme: {
       extend: {
-        fontFamily: {
-          sans: ['"Plus Jakarta Sans"', 'sans-serif'],
-          mono: ['"JetBrains Mono"', 'monospace'],
-        },
-        colors: {
-          brand: {
-            50: '#f0fdf4',
-            100: '#dcfce7',
-            500: '#10b981',
-            600: '#059669',
-            700: '#047857',
-            glow: 'rgba(16, 185, 129, 0.15)'
-          },
-          panel: {
-            bg: '#f8fafc',
-            card: '#ffffff',
-            border: '#e2e8f0',
-            text: '#0f172a',
-            muted: '#64748b'
-          }
-        }
+        fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'], mono: ['"JetBrains Mono"', 'monospace'] },
+        colors: { brand: { 50: '#f0fdf4', 100: '#dcfce7', 500: '#10b981', 600: '#059669' }, panel: { bg: '#f8fafc', card: '#ffffff', border: '#e2e8f0', text: '#0f172a', muted: '#64748b' } }
       }
     }
   }
@@ -62,6 +44,7 @@
 </head>
 <body class="bg-panel-bg text-panel-text font-sans min-h-screen antialiased selection:bg-brand-100">
 
+<!-- OVERLOAD GLOBAL SCREEN LOADING -->
 <div id="global-loader" class="fixed inset-0 bg-white/70 backdrop-blur-md z-[9999] hidden items-center justify-center flex-col gap-4 transition-all duration-200 opacity-0">
   <div class="w-12 h-12 border-4 border-slate-200 border-t-brand-500 rounded-full animate-spin"></div>
   <p class="text-sm font-bold text-slate-700 font-mono tracking-widest uppercase">Executing Network Task...</p>
@@ -71,6 +54,7 @@
 
 <div id="shell" class="flex min-h-screen">
   
+  <!-- SIDEBAR NAVIGATION -->
   <aside id="sidebar" class="w-64 bg-white border-r border-panel-border flex flex-col fixed top-0 bottom-0 left-0 z-[200] transition-transform duration-300 -translate-x-full md:translate-x-0 shadow-sm">
     <div class="p-6 border-b border-panel-border flex items-center gap-3">
       <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-500 to-emerald-400 flex items-center justify-center text-white font-bold text-lg shadow-md shadow-brand-glow">P</div>
@@ -96,6 +80,7 @@
     </nav>
   </aside>
 
+  <!-- MAIN AREA LAYOUT -->
   <div id="main" class="flex-1 md:ml-64 flex flex-col min-h-screen">
     <header class="h-16 border-b border-panel-border bg-white/80 backdrop-blur-md sticky top-0 z-[100] px-6 flex items-center justify-between shadow-sm">
       <div class="flex items-center gap-4">
@@ -109,6 +94,7 @@
 
     <main class="p-6 max-w-7xl w-full mx-auto flex-1">
       
+      <!-- PAGE 1: DASHBOARD CONSOLE -->
       <div id="page-dashboard" class="page active space-y-6">
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div class="bg-white border rounded-2xl p-5 shadow-sm relative overflow-hidden">
@@ -164,6 +150,7 @@
         </div>
       </div>
 
+      <!-- PAGE 2: EKSEKUSI KAMPANYE -->
       <div id="page-kampanye" class="page space-y-6">
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div class="lg:col-span-7 bg-white border rounded-2xl p-6 shadow-sm space-y-5">
@@ -211,6 +198,7 @@
         </div>
       </div>
 
+      <!-- PAGE 3: KELOLA TEMPLATE -->
       <div id="page-template" class="page space-y-6">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div class="bg-white border rounded-2xl p-6 shadow-sm space-y-4">
@@ -240,6 +228,7 @@
         </div>
       </div>
 
+      <!-- PAGE 4: INTEGRASI DEVICE -->
       <div id="page-koneksi" class="page space-y-6">
         <div class="flex items-center justify-between bg-white border p-4 rounded-2xl shadow-sm">
           <div><h2 class="text-sm font-bold text-slate-800">Cluster Jaringan Gateway</h2><p class="text-xs text-panel-muted">Kelola multi-folder session otomatis</p></div>
@@ -252,6 +241,7 @@
   </div>
 </div>
 
+<!-- CONNECT WIZARD MULTI-METHOD MODAL -->
 <div id="connectModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[999] hidden items-center justify-center p-4 opacity-0 transition-opacity duration-200">
   <div class="bg-white border rounded-2xl w-full max-w-md shadow-xl overflow-hidden scale-95 transition-transform duration-200">
     <div class="p-5 border-b flex items-center justify-between bg-slate-50/50">
@@ -263,16 +253,14 @@
         <button id="m-btn-qr" onclick="toggleModalMethod('qr')" class="flex-1 py-2 text-xs font-bold rounded-lg bg-white shadow-sm text-slate-800 transition-all">Scan QR Code</button>
         <button id="m-btn-pairing" onclick="toggleModalMethod('pairing')" class="flex-1 py-2 text-xs font-semibold rounded-lg text-panel-muted hover:text-slate-800 transition-all">Pairing Code</button>
       </div>
-      
       <div id="m-pane-qr" class="flex flex-col items-center justify-center py-4 space-y-3">
         <div id="modal-qrcode" class="p-3 bg-white border rounded-xl shadow-inner min-h-[200px] min-w-[200px] flex items-center justify-center"></div>
         <p class="text-xs text-panel-muted font-mono" id="qr-modal-placeholder">Menunggu String Matrix Server...</p>
       </div>
-      
       <div id="m-pane-pairing" class="hidden space-y-4">
         <div>
           <label class="block text-xs font-bold text-slate-600 uppercase mb-2">Nomor Telepon Gateway</label>
-          <input type="tel" id="m-pair-phone" placeholder="Contoh: 6282322791101" class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-mono outline-none focus:border-brand-500"/>
+          <input type="tel" id="m-pair-phone" placeholder="Contoh: 6282322791101" class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-mono outline-none"/>
         </div>
         
         <button id="btnSubmitPairing" onclick="submitPairingRequest()" class="w-full py-2.5 bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98]">
@@ -284,19 +272,19 @@
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            Generating Token...
+            Generating...
           </span>
         </button>
         
-        <div id="m-pair-box" class="hidden bg-slate-900 text-white border border-slate-800 rounded-xl p-5 text-center font-mono relative overflow-hidden group">
-          <div class="text-[9px] text-slate-400 font-bold uppercase mb-1">Pairing Code Token Meta</div>
-          <div id="m-pair-code" class="text-2xl font-bold tracking-[0.25em] text-brand-400 select-all py-1">——————</div>
+        <div id="m-pair-box" class="hidden bg-slate-900 text-white border border-slate-800 rounded-xl p-5 text-center font-mono">
+          <div id="m-pair-code" class="text-2xl font-bold tracking-[0.25em] text-brand-400 select-all">——————</div>
         </div>
       </div>
     </div>
   </div>
 </div>
 
+<!-- CONFIRMATION MODAL -->
 <div id="modalOverlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[999] hidden items-center justify-center p-4 opacity-0 transition-opacity duration-200" onclick="if(event.target===this) closeModal()">
   <div class="bg-white border rounded-2xl w-full max-w-md shadow-xl overflow-hidden scale-95 transition-transform duration-200">
     <div class="p-5 border-b flex items-center justify-between bg-slate-50/50"><h4 id="modalTitle" class="font-bold text-slate-800 text-sm">Konfirmasi</h4></div>
@@ -317,7 +305,6 @@ let rowCount = 0; let selectedFile = null;
 const alertTimers = {}; let _modalCb = null;
 let currentModalSessionId = null; let activeModalMethod = 'qr';
 
-// Simpan data awal template yang dipasok oleh EJS saat boot pertama
 const initialTemplatesFromServer = <%- JSON.stringify(initialTemplates) %>;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -342,9 +329,6 @@ async function withLoading(asyncFn) {
   }
 }
 
-// ══════════════════════════════════════
-// DYNAMIC MULTI-SESSION DRIVER
-// ══════════════════════════════════════
 async function createNewDeviceSession() {
   const res = await api('/api/create-session', 'POST');
   if(res.success) {
@@ -371,7 +355,7 @@ async function fetchAndRenderDevices() {
         <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${d.connected?'bg-brand-50 text-brand-600 border border-brand-200':'bg-slate-50 text-slate-500'}"><span class="w-2 h-2 rounded-full ${dotCls}"></span>${d.connected?'Connected':'Offline'}</span>
       </div>
       <div class="flex gap-2 pt-2">
-        ${!d.connected ? `<button onclick="openConnectWizard('${d.sessionId}')" class="flex-1 py-2 border rounded-xl font-bold text-xs bg-slate-50 hover:bg-slate-100 flex items-center justify-center gap-1.5">Tautkan Perangkat</button>` : ''}
+        ${!d.connected ? `<button onclick="openConnectWizard('${d.sessionId}')" class="flex-1 py-2 border rounded-xl font-bold text-xs bg-slate-50 hover:bg-slate-100 flex items-center justify-center gap-1.5">Tautkan</button>` : ''}
         <button onclick="deleteDeviceSession('${d.sessionId}')" class="py-2 px-3 border border-rose-200 text-rose-500 rounded-xl hover:bg-rose-50 transition-all">Hapus Sesi</button>
       </div>
     `;
@@ -416,7 +400,6 @@ function toggleModalMethod(method) {
   }
 }
 
-// REQUEST PAIRING CODE DENGAN OVERLOAD INTERNAL BUTTON SPINNER LOADING
 async function submitPairingRequest() {
   const phone = document.getElementById('m-pair-phone').value.trim();
   if(!phone) return;
@@ -425,7 +408,6 @@ async function submitPairingRequest() {
   const textLabel = document.getElementById('textSubmitPairing');
   const spinnerLabel = document.getElementById('spinnerSubmitPairing');
 
-  // Lock state tombol pairing & tampilkan spinner loading internal
   btn.disabled = true;
   btn.classList.add('bg-brand-600', 'cursor-not-allowed');
   textLabel.classList.add('hidden');
@@ -437,13 +419,10 @@ async function submitPairingRequest() {
     if(res.code) {
       document.getElementById('m-pair-box').classList.remove('hidden');
       document.getElementById('m-pair-code').textContent = res.code;
-    } else if (res.error) {
-      alert("Error: " + res.error);
     }
-  } catch (err) {
-    console.error(err);
+  } catch(e) { 
+    console.error(e); 
   } finally {
-    // Kembalikan state tombol pairing ke posisi normal
     btn.disabled = false;
     btn.classList.remove('bg-brand-600', 'cursor-not-allowed');
     textLabel.classList.remove('hidden');
@@ -458,9 +437,6 @@ function deleteDeviceSession(sessionId) {
   });
 }
 
-// ══════════════════════════════════════
-// WEB SOCKET LIVE INTERFACES
-// ══════════════════════════════════════
 socket.on('wa-qr-update', ({ sessionId, qr }) => {
   if(currentModalSessionId === sessionId && activeModalMethod === 'qr') {
     document.getElementById('qr-modal-placeholder').style.display = 'none';
@@ -507,7 +483,6 @@ socket.on('terminal-log', ({ ts, msg, type }) => {
   t.appendChild(el); t.scrollTop = t.scrollHeight;
 });
 
-// SPA SINGLE PAGE APPLICATION CLIENT-SIDE ROUTER ENGINE
 function nav(el, name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.className = 'nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-panel-muted border border-transparent transition-all');
@@ -517,7 +492,6 @@ function nav(el, name) {
   closeSidebar();
 }
 
-// TEMPLATE LOGIC MANAGERS
 function renderTemplates(data) {
   const list = document.getElementById('templateList');
   document.getElementById('tplCount').textContent = data.length + ' Item';
@@ -555,7 +529,6 @@ async function loadTemplateOptions() {
   data.forEach(t => { const o = document.createElement('option'); o.value = t.content; o.textContent = t.title; sel.appendChild(o); });
 }
 
-// INTERACTIVE COMPONENT HELPERS
 function onFileSelect(e) { selectedFile = e.target.files[0]; document.getElementById('dzFile').textContent = selectedFile ? `Terpilih: ${selectedFile.name}` : ''; }
 async function uploadKampanye() {
   const tpl = document.getElementById('selectTemplate').value; const link = document.getElementById('targetLink').value.trim();
