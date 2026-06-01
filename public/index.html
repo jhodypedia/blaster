@@ -11,10 +11,10 @@
 
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="/socket.io/socket.io.js"></script>
 
 <script>
-  // Tailwind custom configuration for seamless light-theme enterprise styling
   tailwind.config = {
     theme: {
       extend: {
@@ -45,27 +45,28 @@
 </script>
 
 <style>
-  /* Custom scrollbar and subtle layout overlays */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; }
   ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-  /* Smooth page dynamic transitions */
   .page { display: none; animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
   .page.active { display: block; }
   @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 
-  /* Pulse glass animation for connecting state */
   .pulse-glow { animation: pulseGlow 2s infinite ease-in-out; }
   @keyframes pulseGlow { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.4); } 50% { opacity: 0.6; box-shadow: 0 0 0 8px rgba(234, 179, 8, 0); } }
 
-  /* Realtime dynamic badge flasher */
   @keyframes rowFlash { 0% { background-color: rgba(16, 185, 129, 0.15); } 100% { background-color: transparent; } }
   .new-row { animation: rowFlash 0.8s ease-out forwards; }
 </style>
 </head>
 <body class="bg-panel-bg text-panel-text font-sans min-height-screen antialiased selection:bg-brand-100">
+
+<div id="global-loader" class="fixed inset-0 bg-white/70 backdrop-blur-md z-[9999] hidden items-center justify-center flex-col gap-4 transition-all duration-200 opacity-0">
+  <div class="w-12 h-12 border-4 border-slate-200 border-t-brand-500 rounded-full animate-spin"></div>
+  <p class="text-sm font-bold text-slate-700 font-mono tracking-wide uppercase">Memproses Perintah Engine...</p>
+</div>
 
 <div id="sb-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[199] hidden transition-opacity duration-300 opacity-0" onclick="closeSidebar()"></div>
 
@@ -76,7 +77,7 @@
 
 <div id="shell" class="flex min-h-screen">
 
-  <aside id="sidebar" class="w-64 bg-white border-right border-panel-border flex flex-col fixed top-0 bottom-0 left-0 z-[200] transition-transform duration-300 -translate-x-full md:translate-x-0 border-r shadow-sm">
+  <aside id="sidebar" class="w-64 bg-white border-r border-panel-border flex flex-col fixed top-0 bottom-0 left-0 z-[200] transition-transform duration-300 -translate-x-full md:translate-x-0 shadow-sm">
     <div class="p-6 border-b border-panel-border flex items-center gap-3">
       <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-500 to-emerald-400 flex items-center justify-center shadow-md shadow-brand-glow text-white">
         <i data-lucide="radio" class="w-5 h-5"></i>
@@ -89,7 +90,7 @@
 
     <div class="text-[10px] font-mono font-bold uppercase tracking-widest text-slate-400 px-6 pt-6 pb-2">Menu Utama</div>
     <nav class="flex-1 px-4 flex flex-col gap-1">
-      <button data-page="dashboard" onclick="nav(this,'dashboard')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-panel-muted border border-transparent transition-all active">
+      <button data-page="dashboard" onclick="nav(this,'dashboard')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-panel-muted border border-transparent transition-all active bg-brand-50 text-brand-600">
         <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard
       </button>
       <button data-page="kampanye" onclick="nav(this,'kampanye')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-panel-muted border border-transparent transition-all">
@@ -122,16 +123,16 @@
           <i data-lucide="menu" class="w-5 h-5"></i>
         </button>
         <div>
-          <h1 id="topTitle" class="font-bold text-base text-slate-800 leading-tight">Dashboard</h1>
+          <h1 id="topTitle" class="font-bold text-base text-slate-800 leading-tight">Dashboard Overview</h1>
           <p id="topSub" class="text-xs text-panel-muted mt-0.5">Ringkasan performa distribusi pesan</p>
         </div>
       </div>
 
       <div class="flex items-center gap-2">
-        <button onclick="refreshStats()" class="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 transition-all shadow-sm active:scale-95">
+        <button onclick="withLoading(refreshStats)" class="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 transition-all shadow-sm active:scale-95">
           <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Sinkronisasi</span>
         </button>
-        <button onclick="confirmLogout()" class="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-red-200 text-xs font-semibold text-red-600 bg-red-50/50 hover:bg-red-50 transition-all active:scale-95">
+        <button onclick="withLoading(confirmLogout)" class="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-red-200 text-xs font-semibold text-red-600 bg-red-50/50 hover:bg-red-50 transition-all active:scale-95">
           <i data-lucide="log-out" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Disconnect Device</span>
         </button>
       </div>
@@ -146,7 +147,7 @@
               <div class="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600"><i data-lucide="users" class="w-4 h-4"></i></div>
               <span class="text-[10px] font-mono tracking-widest text-slate-400 uppercase font-bold">Total</span>
             </div>
-            <div id="s-total" class="text-3xl font-bold font-mono text-slate-800 mt-4 tracking-tight transition-transform duration-200">0</div>
+            <div id="s-total" class="text-3xl font-bold font-mono text-slate-800 mt-4 tracking-tight">0</div>
             <p class="text-xs font-medium text-panel-muted mt-1">Database Target</p>
             <div class="absolute bottom-0 left-0 right-0 h-1 bg-slate-300"></div>
           </div>
@@ -155,7 +156,7 @@
               <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center"><i data-lucide="check-circle" class="w-4 h-4"></i></div>
               <span class="text-[10px] font-mono tracking-widest text-emerald-400 uppercase font-bold">Sent</span>
             </div>
-            <div id="s-sent" class="text-3xl font-bold font-mono text-emerald-600 mt-4 tracking-tight transition-transform duration-200">0</div>
+            <div id="s-sent" class="text-3xl font-bold font-mono text-emerald-600 mt-4 tracking-tight">0</div>
             <p class="text-xs font-medium text-panel-muted mt-1">Berhasil Dikirim</p>
             <div class="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500"></div>
           </div>
@@ -164,7 +165,7 @@
               <div class="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center"><i data-lucide="x-circle" class="w-4 h-4"></i></div>
               <span class="text-[10px] font-mono tracking-widest text-rose-400 uppercase font-bold">Failed</span>
             </div>
-            <div id="s-failed" class="text-3xl font-bold font-mono text-rose-600 mt-4 tracking-tight transition-transform duration-200">0</div>
+            <div id="s-failed" class="text-3xl font-bold font-mono text-rose-600 mt-4 tracking-tight">0</div>
             <p class="text-xs font-medium text-panel-muted mt-1">Gagal Pengiriman</p>
             <div class="absolute bottom-0 left-0 right-0 h-1 bg-rose-500"></div>
           </div>
@@ -173,7 +174,7 @@
               <div class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center"><i data-lucide="user-minus" class="w-4 h-4"></i></div>
               <span class="text-[10px] font-mono tracking-widest text-amber-400 uppercase font-bold">Skipped</span>
             </div>
-            <div id="s-skip" class="text-3xl font-bold font-mono text-amber-500 mt-4 tracking-tight transition-transform duration-200">0</div>
+            <div id="s-skip" class="text-3xl font-bold font-mono text-amber-500 mt-4 tracking-tight">0</div>
             <p class="text-xs font-medium text-panel-muted mt-1">Bukan Nomor WA</p>
             <div class="absolute bottom-0 left-0 right-0 h-1 bg-amber-500"></div>
           </div>
@@ -218,12 +219,7 @@
               </thead>
               <tbody id="logBody" class="divide-y divide-slate-100 text-sm">
                 <tr>
-                  <td colspan="4" class="py-12">
-                    <div class="flex flex-col items-center justify-center text-panel-muted">
-                      <i data-lucide="inbox" class="w-8 h-8 opacity-40 mb-2"></i>
-                      <p class="text-xs font-medium">Antrean log kosong, silakan unggah data.</p>
-                    </div>
-                  </td>
+                  <td colspan="4" class="py-12 text-center text-panel-muted">Log antrean kosong.</td>
                 </tr>
               </tbody>
             </table>
@@ -252,7 +248,7 @@
 
             <div>
               <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Payload URL / Link Promosi</label>
-              <input type="text" id="targetLink" placeholder="Contoh: https://pansa.my.id/promo" class="w-full bg-slate-50 border border-panel-border rounded-xl px-4 py-3 text-sm font-medium focus:border-brand-500 focus:ring-4 focus:ring-brand-glow outline-none transition-all text-slate-700"/>
+              <input type="text" id="targetLink" placeholder="Contoh: https://pansa.group/promo" class="w-full bg-slate-50 border border-panel-border rounded-xl px-4 py-3 text-sm font-medium focus:border-brand-500 focus:ring-4 focus:ring-brand-glow outline-none transition-all text-slate-700"/>
               <p class="text-[11px] text-panel-muted mt-1.5">Sistem otomatis mengganti token <code class="text-brand-600 font-mono font-bold">[Link]</code> dalam teks.</p>
             </div>
 
@@ -267,7 +263,7 @@
               </div>
             </div>
 
-            <button id="btnUpload" onclick="uploadKampanye()" class="w-full py-3 px-6 bg-brand-500 hover:bg-brand-600 text-white font-bold text-sm rounded-xl shadow-md shadow-brand-glow transition-all active:scale-[0.99] flex items-center justify-center gap-2">
+            <button id="btnUpload" onclick="withLoading(uploadKampanye)" class="w-full py-3 px-6 bg-brand-500 hover:bg-brand-600 text-white font-bold text-sm rounded-xl shadow-md shadow-brand-glow transition-all active:scale-[0.99] flex items-center justify-center gap-2">
               <i data-lucide="upload-cloud" class="w-4 h-4"></i> Sinkronisasi Antrean Database
             </button>
           </div>
@@ -290,14 +286,14 @@
               </div>
 
               <div class="flex gap-3">
-                <button id="btnBlast" onclick="startBlast()" disabled class="flex-1 py-3.5 bg-brand-500 hover:bg-brand-600 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none text-white font-extrabold text-sm rounded-xl shadow-md shadow-brand-glow transition-all active:scale-95 flex items-center justify-center gap-2">
+                <button id="btnBlast" onclick="withLoading(startBlast)" disabled class="flex-1 py-3.5 bg-brand-500 hover:bg-brand-600 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none text-white font-extrabold text-sm rounded-xl shadow-md shadow-brand-glow transition-all active:scale-95 flex items-center justify-center gap-2">
                   <i data-lucide="play" class="w-4 h-4"></i> Trigger Kirim Pesan
                 </button>
-                <button id="btnStop" onclick="stopBlast()" class="flex-1 py-3.5 bg-rose-500 hover:bg-rose-600 text-white font-extrabold text-sm rounded-xl shadow-md shadow-rose-100 transition-all active:scale-95 hidden items-center justify-center gap-2">
+                <button id="btnStop" onclick="withLoading(stopBlast)" class="flex-1 py-3.5 bg-rose-500 hover:bg-rose-600 text-white font-extrabold text-sm rounded-xl shadow-md shadow-rose-100 transition-all active:scale-95 hidden items-center justify-center gap-2">
                   <i data-lucide="square" class="w-4 h-4"></i> Abort Engine
                 </button>
               </div>
-              <button onclick="resetBlast()" class="w-full py-2 border border-slate-200 hover:bg-slate-50 text-slate-500 font-semibold text-xs rounded-xl transition-all">
+              <button onclick="withLoading(resetBlast)" class="w-full py-2 border border-slate-200 hover:bg-slate-50 text-slate-500 font-semibold text-xs rounded-xl transition-all">
                 Wipe Antrean Saat Ini
               </button>
             </div>
@@ -345,7 +341,7 @@
               <p class="font-mono bg-white p-1.5 rounded border border-slate-200 text-[11px] text-slate-600">Format: <span class="text-brand-600 font-bold">[Halo|Hai|Permisi]</span> Kak, temukan diskon di <span class="text-brand-600 font-bold">[Link]</span></p>
             </div>
 
-            <button id="btnSaveTpl" onclick="saveTemplate()" class="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white font-bold text-sm rounded-xl shadow-sm transition-all active:scale-[0.99]">
+            <button id="btnSaveTpl" onclick="withLoading(saveTemplate)" class="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white font-bold text-sm rounded-xl shadow-sm transition-all active:scale-[0.99]">
               Simpan ke Kompilasi Template
             </button>
           </div>
@@ -371,15 +367,16 @@
 
       <div id="page-koneksi" class="page space-y-6">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-4xl">
+          
           <div class="bg-white border border-panel-border rounded-2xl p-6 shadow-sm space-y-4">
             <div class="flex items-center gap-2 border-b border-slate-100 pb-3">
               <i data-lucide="link-2" class="w-4 h-4 text-brand-600"></i>
-              <h3 class="text-sm font-bold text-slate-800">Tautkan Perangkat via Nomor</h3>
+              <h3 class="text-sm font-bold text-slate-800">Opsi 1: Tautkan via Nomor (Pairing Code)</h3>
             </div>
             
             <div id="alertKoneksi" class="p-4 rounded-xl text-xs font-semibold hidden"></div>
             
-            <p class="text-xs text-panel-muted leading-relaxed">Masukkan kode negara di awal nomor (contoh: <code>628xxxx</code>). Pastikan Anda membuka menu <strong>Perangkat Tertaut</strong> pada aplikasi WhatsApp.</p>
+            <p class="text-xs text-panel-muted leading-relaxed">Masukkan kode negara di awal nomor (contoh: <code>628xxxx</code>). Buka WhatsApp -> Perangkat Tertaut -> Tautkan Perangkat.</p>
 
             <div>
               <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Nomor WhatsApp Gateway</label>
@@ -389,7 +386,7 @@
               </div>
             </div>
 
-            <button onclick="requestPairing()" class="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white font-bold text-sm rounded-xl shadow-md shadow-brand-glow transition-all active:scale-[0.99] flex items-center justify-center gap-2">
+            <button onclick="withLoading(requestPairing)" class="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white font-bold text-sm rounded-xl shadow-md shadow-brand-glow transition-all active:scale-[0.99] flex items-center justify-center gap-2">
               <i data-lucide="fingerprint" class="w-4 h-4"></i> Generate Pairing Token
             </button>
 
@@ -400,25 +397,38 @@
             </div>
           </div>
 
-          <div class="space-y-4">
-            <div class="bg-white border border-panel-border rounded-2xl p-5 shadow-sm space-y-3">
-              <div class="text-[11px] font-mono tracking-wider font-bold text-slate-400 uppercase">State Sesi Kredensial</div>
-              <div class="flex items-center gap-4 bg-slate-50 border border-panel-border rounded-xl p-4">
-                <div id="sessDot" class="w-3 h-3 rounded-full bg-slate-300 shrink-0"></div>
-                <div class="min-w-0">
-                  <div id="sessStatus" class="font-bold text-sm text-slate-700">Mencari Data...</div>
-                  <div id="sessNum" class="text-xs font-mono text-panel-muted mt-0.5 truncate">—</div>
-                </div>
+          <div class="bg-white border border-panel-border rounded-2xl p-6 shadow-sm flex flex-col items-center justify-center text-center space-y-4">
+            <div class="flex items-center gap-2 border-b border-slate-100 pb-3 w-full text-left">
+              <i data-lucide="qr-code" class="w-4 h-4 text-brand-600"></i>
+              <h3 class="text-sm font-bold text-slate-800">Opsi 2: Tautkan via Scan QR Code</h3>
+            </div>
+            <p class="text-xs text-panel-muted text-left w-full leading-relaxed">Arahkan kamera pemindai WhatsApp perangkat Anda langsung pada komponen visual QR Code di bawah ini:</p>
+            
+            <div id="qr-container" class="p-4 bg-slate-50 border border-panel-border rounded-2xl flex items-center justify-center min-h-[220px] min-w-[220px]">
+              <div id="qrcode" class="shadow-sm"></div>
+              <div id="qr-placeholder" class="text-xs text-panel-muted font-mono">Menunggu Stream QR Core...</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-4xl">
+          <div class="bg-white border border-panel-border rounded-2xl p-5 shadow-sm space-y-3">
+            <div class="text-[11px] font-mono tracking-wider font-bold text-slate-400 uppercase">State Sesi Kredensial</div>
+            <div class="flex items-center gap-4 bg-slate-50 border border-panel-border rounded-xl p-4">
+              <div id="sessDot" class="w-3 h-3 rounded-full bg-slate-300 shrink-0"></div>
+              <div class="min-w-0">
+                <div id="sessStatus" class="font-bold text-sm text-slate-700">Mencari Data...</div>
+                <div id="sessNum" class="text-xs font-mono text-panel-muted mt-0.5 truncate">—</div>
               </div>
             </div>
+          </div>
 
-            <div class="bg-white border border-panel-border rounded-2xl p-5 shadow-sm space-y-3">
-              <div class="text-[11px] font-mono tracking-wider font-bold text-slate-400 uppercase">Manajemen Sesi</div>
-              <button onclick="confirmLogout()" class="w-full py-2.5 px-4 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs rounded-xl border border-rose-200 transition-all active:scale-[0.99] flex items-center justify-center gap-2">
-                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Bersihkan Sesi &amp; Hapus Cache Kunci
-              </button>
-              <p class="text-[10px] text-panel-muted leading-relaxed">Menghapus file <code>auth_info</code> secara paksa untuk memaksa pembuatan ulang token koneksi baru.</p>
-            </div>
+          <div class="bg-white border border-panel-border rounded-2xl p-5 shadow-sm space-y-3">
+            <div class="text-[11px] font-mono tracking-wider font-bold text-slate-400 uppercase">Manajemen Sesi</div>
+            <button onclick="withLoading(confirmLogout)" class="w-full py-2.5 px-4 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs rounded-xl border border-rose-200 transition-all active:scale-[0.99] flex items-center justify-center gap-2">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Bersihkan Sesi &amp; Hapus Cache Kunci
+            </button>
+            <p class="text-[10px] text-panel-muted leading-relaxed">Menghapus file <code>auth_info</code> secara paksa untuk memaksa pembuatan ulang token koneksi baru.</p>
           </div>
         </div>
       </div>
@@ -450,13 +460,44 @@ let rowCount = 0;
 let selectedFile = null;
 const alertTimers = {};
 let _modalCb = null;
+let qrRenderer = null;
 
 // Initialize SVG icons on bootstrap
 document.addEventListener('DOMContentLoaded', () => {
   lucide.createIcons();
   setupUIEventListeners();
-  refreshStats();
+  withLoading(refreshStats);
 });
+
+// ══════════════════════════════════════
+// GLOBAL ASYNC OVERLOAD LOCKER
+// ══════════════════════════════════════
+async function withLoading(asyncFn) {
+  const loader = document.getElementById('global-loader');
+  const allControls = document.querySelectorAll('button, select, input, textarea, [onclick]');
+  
+  // Amankan halaman dengan screen locker & disable komponen interaktif
+  loader.classList.remove('hidden');
+  loader.classList.add('flex');
+  setTimeout(() => loader.classList.add('opacity-100'), 5);
+  allControls.forEach(ctrl => ctrl.disabled = true);
+
+  try {
+    await asyncFn();
+  } catch (err) {
+    console.error("Overload Execution Interrupted: ", err);
+  } finally {
+    // Kembalikan state kontrol ke sedia kala
+    loader.classList.remove('opacity-100');
+    setTimeout(() => { loader.classList.remove('flex'); loader.classList.add('hidden'); }, 200);
+    allControls.forEach(ctrl => ctrl.disabled = false);
+    
+    // Validasi ulang button trigger blast internal berdasarkan isi record antrean
+    if (ST.total > 0 && (ST.sent + ST.failed + ST.skip < ST.total)) {
+      document.getElementById('btnBlast').disabled = false;
+    }
+  }
+}
 
 function setupUIEventListeners() {
   const sel = document.getElementById('selectTemplate');
@@ -489,8 +530,13 @@ function setupUIEventListeners() {
 // ══════════════════════════════════════
 // SOCKET COMMUNICATIONS HANDLERS
 // ══════════════════════════════════════
-socket.on('wa-status', ({ connected, status, number }) => {
+socket.on('wa-status', ({ connected, status, number, qr }) => {
   updateWaUI(connected, status, number);
+  if (qr && !connected) handleQrRender(qr);
+});
+
+socket.on('wa-qr', ({ qr }) => {
+  if (!ST.isBlasting) handleQrRender(qr);
 });
 
 socket.on('terminal-log', ({ ts, msg, type }) => {
@@ -541,12 +587,28 @@ socket.on('blast-state', ({ isBlasting }) => {
 socket.on('blast-reset', () => {
   ST = { total: 0, sent: 0, failed: 0, skip: 0 };
   updateStats(); updateProgress();
-  document.getElementById('logBody').innerHTML = '<tr><td colspan="4" class="py-12"><div class="flex flex-col items-center justify-center text-panel-muted"><i data-lucide="inbox" class="w-8 h-8 opacity-40 mb-2"></i><p class="text-xs font-medium">Antrean log kosong, silakan unggah data.</p></div></td></tr>';
-  lucide.createIcons();
+  document.getElementById('logBody').innerHTML = '<tr><td colspan="4" class="py-12 text-center text-panel-muted">Log antrean kosong.</td></tr>';
   rowCount = 0;
   document.getElementById('btnBlast').disabled = true;
   document.getElementById('blastStatusPill').innerHTML = 'Idle';
 });
+
+function handleQrRender(qrString) {
+  const placeholder = document.getElementById('qr-placeholder');
+  const qrDiv = document.getElementById('qrcode');
+  
+  placeholder.style.display = 'none';
+  qrDiv.innerHTML = '';
+  
+  qrRenderer = new QRCode(qrDiv, {
+    text: qrString,
+    width: 200,
+    height: 200,
+    colorDark : "#0f172a",
+    colorLight : "#ffffff",
+    correctLevel : QRCode.CorrectLevel.H
+  });
+}
 
 // ══════════════════════════════════════
 // WA PLATFORM STATUS PIPELINE
@@ -562,7 +624,6 @@ function updateWaUI(connected, status, number) {
   const sNum = document.getElementById('sessNum');
   const banner = document.getElementById('reconnect-banner');
 
-  // Reset modifiers
   pill.className = "flex items-center gap-3 p-3 rounded-xl border bg-white transition-all duration-300";
   dot.className = "w-2.5 h-2.5 rounded-full bg-slate-300";
   sDot.className = "w-3 h-3 rounded-full bg-slate-300 shrink-0";
@@ -579,6 +640,10 @@ function updateWaUI(connected, status, number) {
     sStat.textContent = 'Terhubung Terotentikasi';
     sStat.className = "font-bold text-sm text-emerald-700";
     sNum.textContent = number || '—';
+    
+    document.getElementById('qrcode').innerHTML = '';
+    document.getElementById('qr-placeholder').style.display = 'block';
+    document.getElementById('qr-placeholder').textContent = 'Sesi Terkoneksi!';
   } else if (status === 'connecting' || status === 'reconnecting') {
     pill.classList.add('border-yellow-200', 'bg-yellow-50/30');
     dot.classList.add('bg-yellow-500', 'pulse-glow');
@@ -606,7 +671,7 @@ function updateWaUI(connected, status, number) {
 }
 
 // ══════════════════════════════════════
-// TELEMETRY COUNTER SPEED ANIMATOR
+// TELEMETRY COUNTER
 // ══════════════════════════════════════
 function updateStats() {
   animNum('s-total', ST.total);
@@ -668,8 +733,7 @@ function addLogRow(id, phone, status) {
 }
 
 function clearLog() {
-  document.getElementById('logBody').innerHTML = '<tr><td colspan="4" class="py-12"><div class="flex flex-col items-center justify-center text-panel-muted"><i data-lucide="inbox" class="w-8 h-8 opacity-40 mb-2"></i><p class="text-xs font-medium">Antrean log kosong, silakan unggah data.</p></div></td></tr>';
-  lucide.createIcons();
+  document.getElementById('logBody').innerHTML = '<tr><td colspan="4" class="py-12 text-center text-panel-muted">Log antrean kosong.</td></tr>';
   rowCount = 0;
 }
 
@@ -678,12 +742,7 @@ function addTermLine(ts, msg, type) {
   const el = document.createElement('div');
   el.className = 'flex gap-2';
   
-  const typeMap = {
-    ok: 'text-emerald-400',
-    err: 'text-rose-400',
-    warn: 'text-amber-400',
-    info: 'text-slate-400'
-  };
+  const typeMap = { ok: 'text-emerald-400', err: 'text-rose-400', warn: 'text-amber-400', info: 'text-slate-400' };
   const cls = typeMap[type] || 'text-slate-300';
 
   el.innerHTML = `<span class="text-slate-500 shrink-0 select-none">${ts}</span><span class="${cls}">${esc(msg)}</span>`;
@@ -692,27 +751,19 @@ function addTermLine(ts, msg, type) {
 }
 
 // ══════════════════════════════════════
-// ROUTER NAVIGATION STRATEGY
+// ROUTER NAVIGATION
 // ══════════════════════════════════════
-const PAGE_META = {
-  dashboard: ['Dashboard Overview', 'Ringkasan performa distribusi pesan'],
-  kampanye: ['Management Kampanye', 'Upload database target & jalankan pengiriman massal'],
-  template: ['Kompilasi Template', 'Kelola repositori data teks dinamis spintax'],
-  koneksi: ['Integrasi Device', 'Konfigurasi sinkronisasi token gateway WhatsApp'],
-};
-
 function nav(el, name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => {
-    n.classList.remove('active', 'bg-brand-50', 'text-brand-600', 'border-brand-500/20');
+    n.className = 'nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-panel-muted border border-transparent transition-all';
   });
   
   document.getElementById('page-' + name).classList.add('active');
-  el.classList.add('active', 'bg-brand-50', 'text-brand-600', 'border-brand-500/20');
+  el.className = 'nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-brand-600 border border-transparent transition-all bg-brand-50';
 
-  const [title, sub] = PAGE_META[name] || [name, ''];
-  document.getElementById('topTitle').textContent = title;
-  document.getElementById('topSub').textContent = sub;
+  document.getElementById('topTitle').textContent = PAGE_META[name][0];
+  document.getElementById('topSub').textContent = PAGE_META[name][1];
 
   if (name === 'kampanye') loadTemplateOptions();
   if (name === 'template') loadTemplates();
@@ -737,7 +788,7 @@ function closeSidebar() {
 }
 
 // ══════════════════════════════════════
-// DATA LOGIC TRANSMISSION LAYERS
+// DATA LOGIC TRANSMISSION
 // ══════════════════════════════════════
 async function requestPairing() {
   const phone = document.getElementById('pairPhone').value.trim();
@@ -755,7 +806,7 @@ async function requestPairing() {
 }
 
 function confirmLogout() {
-  openModal('Tutus Jaringan Sesi', 'Apakah Anda yakin ingin mematikan koneksi gateway dan menghapus seluruh cache enkripsi? Anda harus menautkan perangkat kembali.', async () => {
+  openModal('Putus Jaringan Sesi', 'Apakah Anda yakin ingin mematikan koneksi gateway dan menghapus seluruh cache enkripsi? Anda harus menautkan perangkat kembali.', async () => {
     try {
       await api('/api/logout', 'POST');
       showAlert('alertKoneksi', 'Kredensial dibersihkan dari penyimpanan.', 'warn');
@@ -772,8 +823,7 @@ async function loadTemplates() {
   document.getElementById('tplCount').textContent = data.length + ' Item';
 
   if (!data.length) {
-    list.innerHTML = '<div class="text-center py-12 text-panel-muted"><i data-lucide="folder-open" class="w-8 h-8 opacity-40 mx-auto mb-2"></i><p class="text-xs">Database template belum dikonfigurasi.</p></div>';
-    lucide.createIcons();
+    list.innerHTML = '<div class="text-center py-12 text-panel-muted"><p class="text-xs">Database template belum dikonfigurasi.</p></div>';
     return;
   }
   
@@ -820,7 +870,6 @@ function editTemplate(id, titleB64, contentB64) {
   document.getElementById('tplFormTitle').textContent = 'Ubah Konstruksi Template';
   document.getElementById('btnSaveTpl').textContent = 'Perbarui Data Template';
   document.getElementById('btnCancelEdit').classList.remove('hidden');
-  document.querySelector('#page-template').scrollTop = 0;
 }
 
 function cancelEdit() {
@@ -863,11 +912,9 @@ async function uploadKampanye() {
   const link = document.getElementById('targetLink').value.trim();
   if (!tpl) return showAlert('alertKampanye', 'Struktur pola template pesan belum dipilih.', 'error');
   if (!link) return showAlert('alertKampanye', 'Payload URL promosi wajib dilampirkan.', 'error');
-  if (!selectedFile) return showAlert('alertKampanye', 'Berkas basis data nomor (.txt) tidak ditemukan.', 'error');
+  if (!selectedFile) return showAlert('alertKampanye', 'Berkas database nomor (.txt) tidak ditemukan.', 'error');
 
   const btn = document.getElementById('btnUpload');
-  btn.disabled = true; btn.textContent = 'Menyinkronkan Komponen Data...';
-
   const fd = new FormData();
   fd.append('file', selectedFile);
   fd.append('messageTemplate', tpl);
@@ -880,9 +927,6 @@ async function uploadKampanye() {
       showAlert('alertKampanye', `${d.total} record data dimuat ke runtime buffer.`, 'success');
     } else { showAlert('alertKampanye', d.error, 'error'); }
   } catch { showAlert('alertKampanye', 'Proses transfer data gagal.', 'error'); }
-
-  btn.disabled = false; btn.innerHTML = '<i data-lucide="upload-cloud" class="w-4 h-4"></i> Sinkronisasi Antrean Database';
-  lucide.createIcons();
 }
 
 async function startBlast() {
@@ -890,17 +934,7 @@ async function startBlast() {
     const d = await api('/api/start-blast', 'POST');
     if (d.success) {
       addTermLine(now(), 'Menginisialisasi core blast engine...', 'ok');
-      
-      // Route internally to dashboard screen view
-      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active', 'bg-brand-50', 'text-brand-600'));
-      
-      document.getElementById('page-dashboard').classList.add('active');
-      const targetNav = document.querySelector('[data-page="dashboard"]');
-      targetNav.classList.add('active', 'bg-brand-50', 'text-brand-600');
-      
-      document.getElementById('topTitle').textContent = PAGE_META.dashboard[0];
-      document.getElementById('topSub').textContent = PAGE_META.dashboard[1];
+      nav(document.querySelector('[data-page="dashboard"]'), 'dashboard');
     } else { showAlert('alertKampanye', d.error || d.message, 'error'); }
   } catch (e) { showAlert('alertKampanye', e.message, 'error'); }
 }
@@ -938,7 +972,7 @@ async function refreshStats() {
 }
 
 // ══════════════════════════════════════
-// MODAL & AMBIENT OVERLAYS CONTROLLERS
+// MODAL & OVERLAYS CONTROLLERS
 // ══════════════════════════════════════
 function openModal(title, msg, cb) {
   document.getElementById('modalTitle').textContent = title;
@@ -955,20 +989,17 @@ function openModal(title, msg, cb) {
   document.getElementById('modalConfirm').onclick = () => { closeModal(); _modalCb && _modalCb(); };
 }
 
+// ══════════════════════════════════════
+// INTERACTIVE UTILITY HELPERS
+// ══════════════════════════════════════
 function closeModal() {
   const m = document.getElementById('modalOverlay');
   m.classList.remove('opacity-100');
   m.querySelector('div').classList.add('scale-95');
-  setTimeout(() => {
-    m.classList.remove('flex');
-    m.classList.add('hidden');
-  }, 200);
+  setTimeout(() => { m.classList.remove('flex'); m.classList.add('hidden'); }, 200);
   _modalCb = null;
 }
 
-// ══════════════════════════════════════
-// INTERACTIVE UTILITY HELPERS
-// ══════════════════════════════════════
 function showAlert(id, msg, type = 'success') {
   const el = document.getElementById(id);
   if (!el) return;
@@ -981,9 +1012,7 @@ function showAlert(id, msg, type = 'success') {
   else if (type === 'error') el.classList.add('bg-rose-50', 'text-rose-700', 'border', 'border-rose-200');
   else el.classList.add('bg-amber-50', 'text-amber-700', 'border', 'border-amber-200');
 
-  alertTimers[id] = setTimeout(() => {
-    el.className = "hidden";
-  }, 5000);
+  alertTimers[id] = setTimeout(() => { el.className = "hidden"; }, 5000);
 }
 
 async function api(url, method = 'GET', body) {
@@ -995,11 +1024,16 @@ async function api(url, method = 'GET', body) {
   return data;
 }
 
-function esc(str) {
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+function esc(str) { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function b64(str) { return btoa(unescape(encodeURIComponent(str))); }
 function now() { return new Date().toLocaleTimeString('id-ID'); }
+
+const PAGE_META = {
+  dashboard: ['Dashboard Overview', 'Ringkasan performa distribusi pesan'],
+  kampanye: ['Management Kampanye', 'Upload database target & jalankan pengiriman massal'],
+  template: ['Kompilasi Template', 'Kelola repositori data teks dinamis spintax'],
+  koneksi: ['Integrasi Device', 'Konfigurasi sinkronisasi token gateway WhatsApp'],
+};
 </script>
 </body>
 </html>
