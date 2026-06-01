@@ -39,7 +39,7 @@ const upload = multer({
 });
 
 // ═══════════════════════════════════════════════════
-// STATE
+// STATE MANAGEMENT
 // ═══════════════════════════════════════════════════
 let sock          = null;
 let isConnected   = false;
@@ -47,9 +47,9 @@ let isBlasting    = false;
 let stopFlag      = false;
 let reconnectTimer = null;
 let reconnectCount = 0;
-const MAX_RECONNECT = 999; // reconnect terus selama proses berjalan
+const MAX_RECONNECT = 999; 
 
-const log = pino({ level: 'silent' }); // semua log diarahkan ke console + socket secara kustom
+const log = pino({ level: 'silent' }); 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ═══════════════════════════════════════════════════
@@ -73,14 +73,14 @@ function emitLog(msg, type = 'info') {
 }
 
 // ═══════════════════════════════════════════════════
-// INISIALISASI BAILEYS — AUTO RECONNECT + AUTO RESET TIMEOUT
+// INISIALISASI BAILEYS CORE
 // ═══════════════════════════════════════════════════
 async function initWhatsApp() {
     try {
         const { state, saveCreds } = await useMultiFileAuthState('auth_info');
         const { version }          = await fetchLatestBaileysVersion();
 
-        emitLog(`Baileys v${version.join('.')} — menginisialisasi...`, 'info');
+        emitLog(`Baileys Engine v${version.join('.')} — menginisialisasi...`, 'info');
 
         sock = makeWASocket({
             version,
@@ -92,11 +92,10 @@ async function initWhatsApp() {
             printQRInTerminal: false,
             browser:          ['PANSA BLASTER', 'Chrome', '120.0'],
             
-            // Tweak Stabilitas Sesi & Anti-Timeout Awal
             connectTimeoutMs:       60_000, 
             defaultQueryTimeoutMs:  60_000,
-            keepAliveIntervalMs:    10_000, // Ping lebih agresif ke server WA agar tidak idle
-            syncFullHistory:        false,  // Mencegah penumpukan beban data chat masuk yang berat
+            keepAliveIntervalMs:    10_000, 
+            syncFullHistory:        false,  
             
             retryRequestDelayMs:    2_000,
             maxMsgRetryCount:       3,
@@ -104,12 +103,10 @@ async function initWhatsApp() {
             shouldIgnoreJid: jid => isJidBroadcast(jid),
         });
 
-        // Simpan kredensial setiap kali ada pembaruan state
         sock.ev.on('creds.update', saveCreds);
 
-        // Handler status koneksi
         sock.ev.on('connection.update', async (update) => {
-            const { connection, lastDisconnect } = update;
+            const { connection, lastDisconnect, reason: closeReason } = update;
 
             if (connection === 'connecting') {
                 emitLog('Menghubungkan ke WhatsApp...', 'info');
@@ -127,31 +124,52 @@ async function initWhatsApp() {
             if (connection === 'close') {
                 isConnected = false;
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
-                const reason     = lastDisconnect?.error?.message || 'Unknown';
+                const reason     = lastDisconnect?.error?.message || closeReason || 'Unknown';
 
                 emitLog(`Koneksi terputus. Code: ${statusCode} — ${reason}`, 'warn');
                 io.emit('wa-status', { connected: false, status: 'disconnected' });
 
-                // 1. HANDLER JIKA LOGOUT PERMANEN
-                if (statusCode === DisconnectReason.loggedOut) {
-                    emitLog('Sesi logout permanen. Hapus folder auth_info untuk login ulang.', 'err');
+                // 1. HANDLER JIKA LOGOUT PERMANEN (ERROR 401 / MANUAL LOGOUT)
+                if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
+                    emitLog('Sesi di-terminate atau logout permanen oleh server WhatsApp.', 'err');
                     io.emit('wa-status', { connected: false, status: 'logged_out' });
+                    
+                    try {
+                        sock.ev.removeAllListeners('connection.update');
+                        sock.end();
+                    } catch (_) {}
+                    
+                    fs.rmSync('auth_info', { recursive: true, force: true });
                     return;
                 }
 
-                // 2. AUTOMATIC RE-GENERATE JIKA TIMEOUT SAAT PROSES PAIRING
+                // 2. AUTOMATIC CLEAN RE-GENERATE UNTUK PAIRING TIMEOUT (ERROR 428 / 408)
                 const isBelumLogin = !sock?.authState?.creds?.me;
                 if (isBelumLogin && (statusCode === 428 || statusCode === 408 || reason.includes('Timed Out'))) {
-                    emitLog('Pairing timeout atau koneksi di-terminate server WA. Mereset sisa sesi...', 'warn');
+                    emitLog('Pairing timeout terdeteksi. Mematikan socket secara aman...', 'warn');
                     
-                    try { sock?.ws?.close(); } catch(_) {}
+                    if (sock) {
+                        try {
+                            sock.ev.removeAllListeners('connection.update');
+                            sock.end();
+                            sock.ws.close();
+                        } catch(_) {}
+                    }
                     
-                    // Hapus folder auth_info kotor agar siap digunakan kembali dari nol
-                    fs.rmSync('auth_info', { recursive: true, force: true });
-                    io.emit('wa-status', { connected: false, status: 'logged_out' });
-                    
-                    emitLog('Sistem siap menerima request pairing baru dalam 3 detik.', 'info');
-                    setTimeout(initWhatsApp, 3000);
+                    // Jeda I/O operasi file
+                    setTimeout(() => {
+                        try {
+                            fs.rmSync('auth_info', { recursive: true, force: true });
+                            emitLog('Folder beralih ke state bersih.', 'ok');
+                        } catch (e) {
+                            console.error('Gagal hapus file kotor:', e.message);
+                        }
+                        
+                        io.emit('wa-status', { connected: false, status: 'logged_out' });
+                        emitLog('Sistem siap menerima request pairing baru dalam 3 detik.', 'info');
+                        setTimeout(initWhatsApp, 3000);
+                    }, 1500);
+
                     return; 
                 }
 
@@ -159,7 +177,7 @@ async function initWhatsApp() {
                     emitLog('Sesi digantikan perangkat lain.', 'warn');
                 }
 
-                // Jalankan proses reconnect berkala jika akun memang sudah ter-pairing sebelumnya
+                // Lakukan reconnect berkala hanya jika perangkat sudah ter-pairing sebelumnya
                 scheduleReconnect();
             }
         });
@@ -172,13 +190,11 @@ async function initWhatsApp() {
     }
 }
 
-// ── Jadwalkan reconnect dengan backoff eksponensial (Hanya untuk nomor yang sudah login) ──
 function scheduleReconnect() {
     if (reconnectTimer) clearTimeout(reconnectTimer);
     
-    // Proteksi: Jika nomor belum login, jangan membanjiri looping reconnect
     if (!sock?.authState?.creds?.me) {
-        emitLog('Sesi kosong / belum ter-pairing. Menunggu trigger pairing baru dari dashboard.', 'info');
+        emitLog('Sesi kosong. Menunggu instruksi pairing dari dashboard.', 'info');
         return;
     }
 
@@ -187,7 +203,6 @@ function scheduleReconnect() {
         return;
     }
 
-    // Backoff: 5s, 10s, 20s, 40s, maks 120s
     const base   = Math.min(5000 * Math.pow(2, reconnectCount), 120_000);
     const jitter = Math.floor(Math.random() * 3000);
     const wait   = base + jitter;
@@ -202,22 +217,18 @@ function scheduleReconnect() {
 }
 
 // ═══════════════════════════════════════════════════
-// API: STATUS WA
+// API ENDPOINTS
 // ═══════════════════════════════════════════════════
 app.get('/api/wa-status', (req, res) => {
     const number = sock?.user?.id?.split(':')[0] || null;
     res.json({ connected: isConnected, number });
 });
 
-// ═══════════════════════════════════════════════════
-// API: REQUEST PAIRING CODE (STABILIZED)
-// ═══════════════════════════════════════════════════
 app.post('/api/request-pairing', async (req, res) => {
     const { phone } = req.body;
     if (!phone) return res.status(400).json({ error: 'Nomor wajib diisi' });
 
     try {
-        // Validasi state socket yang ketat untuk mencegah tabrakan sesi aktif
         if (isConnected || sock?.authState?.creds?.me) {
             return res.json({ message: 'WhatsApp sudah terhubung.' });
         }
@@ -225,19 +236,13 @@ app.post('/api/request-pairing', async (req, res) => {
             return res.status(503).json({ error: 'Socket belum siap, silakan tunggu sebentar.' });
         }
 
-        // Normalisasi format nomor tujuan
         const clean = phone.replace(/[^0-9]/g, '');
         if (clean.length < 8) return res.status(400).json({ error: 'Nomor WhatsApp tidak valid' });
 
         emitLog(`Meminta pairing code untuk nomor ${clean}...`, 'info');
-
-        // Jeda waktu krusial untuk memastikan node Baileys siap melakukan transaksi data stream
         await delay(1500);
 
-        // Eksekusi request pairing code ke server WA
         let code = await sock.requestPairingCode(clean);
-
-        // Format string kode menjadi format standar visual WA (XXXX-XXXX) jika masih polos
         code = code?.replace(/-/g, '')?.match(/.{1,4}/g)?.join('-') || code;
 
         emitLog(`Pairing code berhasil didapat: ${code}`, 'ok');
@@ -245,28 +250,27 @@ app.post('/api/request-pairing', async (req, res) => {
 
     } catch (err) {
         emitLog(`Pairing error: ${err.message}`, 'err');
-
         const errMsg = err.message || '';
         if (errMsg.includes('rate-overlimit') || errMsg.includes('429')) {
-            return res.status(429).json({ error: 'Terlahu banyak permintaan kode. Silakan tunggu beberapa menit.' });
+            return res.status(429).json({ error: 'Terlalu banyak permintaan kode. Silakan tunggu beberapa menit.' });
         } 
-        if (errMsg.includes('Connection Closed') || errMsg.includes('timeout')) {
-            return res.status(503).json({ error: 'Koneksi ke server WhatsApp tidak stabil. Silakan coba lagi.' });
-        }
-
-        res.status(500).json({ error: 'Gagal mendapatkan pairing code. Pastikan nomor terdaftar di WA.' });
+        res.status(500).json({ error: 'Gagal mendapatkan pairing code dari server WhatsApp.' });
     }
 });
 
-// ═══════════════════════════════════════════════════
-// API: LOGOUT / RESET SESI
-// ═══════════════════════════════════════════════════
 app.post('/api/logout', async (req, res) => {
     try {
         if (sock && isConnected) await sock.logout();
+        
+        try {
+            sock.ev.removeAllListeners('connection.update');
+            sock.end();
+        } catch (_) {}
+
         fs.rmSync('auth_info', { recursive: true, force: true });
         emitLog('Sesi WA dihapus. Silakan pairing ulang.', 'warn');
         io.emit('wa-status', { connected: false, status: 'logged_out' });
+        
         setTimeout(initWhatsApp, 3000);
         res.json({ success: true });
     } catch (err) {
@@ -275,7 +279,7 @@ app.post('/api/logout', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════
-// API: TEMPLATE — CRUD
+// API: TEMPLATE CRUD
 // ═══════════════════════════════════════════════════
 app.get('/api/templates', async (req, res) => {
     try {
@@ -286,26 +290,18 @@ app.get('/api/templates', async (req, res) => {
 
 app.post('/api/templates', async (req, res) => {
     const { title, content } = req.body;
-    if (!title?.trim() || !content?.trim())
-        return res.status(400).json({ error: 'Judul dan isi wajib diisi' });
+    if (!title?.trim() || !content?.trim()) return res.status(400).json({ error: 'Judul dan isi wajib diisi' });
     try {
-        const [r] = await pool.query(
-            'INSERT INTO templates (title, content) VALUES (?, ?)',
-            [title.trim(), content.trim()]
-        );
+        const [r] = await pool.query('INSERT INTO templates (title, content) VALUES (?, ?)', [title.trim(), content.trim()]);
         res.json({ success: true, id: r.insertId });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/templates/:id', async (req, res) => {
     const { title, content } = req.body;
-    if (!title?.trim() || !content?.trim())
-        return res.status(400).json({ error: 'Judul dan isi wajib diisi' });
+    if (!title?.trim() || !content?.trim()) return res.status(400).json({ error: 'Judul dan isi wajib diisi' });
     try {
-        await pool.query(
-            'UPDATE templates SET title=?, content=? WHERE id=?',
-            [title.trim(), content.trim(), req.params.id]
-        );
+        await pool.query('UPDATE templates SET title=?, content=? WHERE id=?', [title.trim(), content.trim(), req.params.id]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -318,13 +314,11 @@ app.delete('/api/templates/:id', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════
-// API: UPLOAD TARGET + SIAPKAN ANTREAN
+// API: QUEUE & TARGET MANAGEMENT
 // ═══════════════════════════════════════════════════
 app.post('/api/upload-targets', upload.single('file'), async (req, res) => {
     const { messageTemplate, targetLink } = req.body;
-
-    if (!req.file || !messageTemplate || !targetLink)
-        return res.status(400).json({ error: 'File, template, dan link wajib diisi' });
+    if (!req.file || !messageTemplate || !targetLink) return res.status(400).json({ error: 'Komponen file, template, dan link wajib diisi' });
 
     try {
         const raw   = fs.readFileSync(req.file.path, 'utf-8');
@@ -338,31 +332,23 @@ app.post('/api/upload-targets', upload.single('file'), async (req, res) => {
         }).filter(n => n.length >= 8 && n.length <= 15);
 
         const unique = [...new Set(numbers)];
-        if (!unique.length)
-            return res.status(400).json({ error: 'Tidak ada nomor valid di file' });
+        if (!unique.length) return res.status(400).json({ error: 'Tidak ada nomor valid di file' });
 
         const finalTemplate = messageTemplate.replace(/\[Link\]/gi, targetLink);
 
         await pool.query('DELETE FROM blast_targets');
         const values = unique.map(n => [n, 'pending', finalTemplate]);
-        await pool.query(
-            'INSERT INTO blast_targets (phone_number, status, message) VALUES ?',
-            [values]
-        );
+        await pool.query('INSERT INTO blast_targets (phone_number, status, message) VALUES ?', [values]);
 
         fs.unlinkSync(req.file.path);
         emitLog(`Upload sukses: ${unique.length} target dimuat`, 'ok');
         io.emit('blast-ready', { total: unique.length });
         res.json({ success: true, total: unique.length });
     } catch (err) {
-        console.error('[UPLOAD]', err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// ═══════════════════════════════════════════════════
-// API: STATISTIK
-// ═══════════════════════════════════════════════════
 app.get('/api/stats', async (req, res) => {
     try {
         const [[row]] = await pool.query(`
@@ -378,20 +364,15 @@ app.get('/api/stats', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ═══════════════════════════════════════════════════
-// API: LOG ANTREAN (Hydrate saat dashboard direfresh)
-// ═══════════════════════════════════════════════════
 app.get('/api/blast-targets', async (req, res) => {
     try {
-        const [rows] = await pool.query(
-            'SELECT id, phone_number, status, updated_at FROM blast_targets ORDER BY id DESC LIMIT 500'
-        );
+        const [rows] = await pool.query('SELECT id, phone_number, status, updated_at FROM blast_targets ORDER BY id DESC LIMIT 500');
         res.json(rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ═══════════════════════════════════════════════════
-// BLAST ENGINE
+// BLAST ENGINE LOOPER
 // ═══════════════════════════════════════════════════
 async function startBlastEngine() {
     if (isBlasting) return;
@@ -402,10 +383,7 @@ async function startBlastEngine() {
     io.emit('blast-started');
 
     try {
-        const [targets] = await pool.query(
-            'SELECT * FROM blast_targets WHERE status = "pending" ORDER BY id ASC'
-        );
-
+        const [targets] = await pool.query('SELECT * FROM blast_targets WHERE status = "pending" ORDER BY id ASC');
         if (!targets.length) {
             emitLog('Tidak ada target pending.', 'warn');
             return;
@@ -416,7 +394,6 @@ async function startBlastEngine() {
         for (const target of targets) {
             if (stopFlag) { emitLog('Blast dihentikan manual.', 'warn'); break; }
 
-            // Tunggu reconnect jika WA mendadak terputus di tengah proses blast (maks 60s)
             if (!isConnected) {
                 emitLog('WA terputus, menunggu reconnect...', 'warn');
                 let waited = 0;
@@ -442,8 +419,7 @@ async function startBlastEngine() {
                     const msg = parseSpintax(target.message);
                     await sock.sendMessage(jid, { text: msg });
                     status = 'sent';
-                    // Delay random anti-banned (12 - 25 detik)
-                    waitMs = Math.floor(Math.random() * (25000 - 12000 + 1)) + 12000;
+                    waitMs = Math.floor(Math.random() * (25000 - 12000 + 1)) + 12000; // Jeda anti-banned 12-25 detik
                 }
             } catch (err) {
                 emitLog(`Gagal kirim ${target.phone_number}: ${err.message}`, 'err');
@@ -451,16 +427,8 @@ async function startBlastEngine() {
                 waitMs = 3000;
             }
 
-            await pool.query(
-                'UPDATE blast_targets SET status = ? WHERE id = ?',
-                [status, target.id]
-            );
-
-            io.emit('blast-update', {
-                id:           target.id,
-                phone_number: target.phone_number,
-                status,
-            });
+            await pool.query('UPDATE blast_targets SET status = ? WHERE id = ?', [status, target.id]);
+            io.emit('blast-update', { id: target.id, phone_number: target.phone_number, status });
 
             await delay(waitMs);
         }
@@ -473,29 +441,21 @@ async function startBlastEngine() {
     }
 }
 
-// ═══════════════════════════════════════════════════
-// API: KONTROL BLAST
-// ═══════════════════════════════════════════════════
 app.post('/api/start-blast', (req, res) => {
-    if (!isConnected)
-        return res.status(400).json({ error: 'WhatsApp belum terhubung' });
-    if (isBlasting)
-        return res.json({ message: 'Blast sedang berjalan' });
-
+    if (!isConnected) return res.status(400).json({ error: 'WhatsApp belum terhubung' });
+    if (isBlasting) return res.json({ message: 'Blast sedang berjalan' });
     startBlastEngine();
     res.json({ success: true });
 });
 
 app.post('/api/stop-blast', (req, res) => {
-    if (!isBlasting)
-        return res.json({ message: 'Blast tidak sedang berjalan' });
+    if (!isBlasting) return res.json({ message: 'Blast tidak sedang berjalan' });
     stopFlag = true;
     res.json({ success: true, message: 'Sinyal stop dikirim.' });
 });
 
 app.post('/api/reset-blast', async (req, res) => {
-    if (isBlasting)
-        return res.status(400).json({ error: 'Hentikan blast terlebih dahulu.' });
+    if (isBlasting) return res.status(400).json({ error: 'Hentikan blast terlebih dahulu.' });
     try {
         await pool.query('DELETE FROM blast_targets');
         io.emit('blast-reset');
@@ -504,7 +464,7 @@ app.post('/api/reset-blast', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════
-// SOCKET.IO — HANDSHAKE STATE
+// SOCKET HANDSHAKE
 // ═══════════════════════════════════════════════════
 io.on('connection', (socket) => {
     const number = sock?.user?.id?.split(':')[0] || null;
@@ -517,10 +477,9 @@ io.on('connection', (socket) => {
 });
 
 // ═══════════════════════════════════════════════════
-// BOOT SERVER
+// BOOTSTRAPPER
 // ═══════════════════════════════════════════════════
 const PORT = process.env.PORT || 3000;
-
 server.listen(PORT, async () => {
     console.log('\n╔══════════════════════════════════════╗');
     console.log(`║   PANSA BLASTER aktif → port ${PORT}    ║`);
