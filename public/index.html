@@ -5,12 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>PANSA BLASTER — Admin Panel</title>
 
+<!-- PRECONNECT & FONTS -->
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 
+<!-- MODERN CDN TOOLKIT -->
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
+<!-- Library Rendering QR Code Dinamis -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="/socket.io/socket.io.js"></script>
 
@@ -63,13 +66,16 @@
 </head>
 <body class="bg-panel-bg text-panel-text font-sans min-height-screen antialiased selection:bg-brand-100">
 
+<!-- ══════════════════ OVERLOAD GLOBAL SCREEN LOADING ══════════════════ -->
 <div id="global-loader" class="fixed inset-0 bg-white/70 backdrop-blur-md z-[9999] hidden items-center justify-center flex-col gap-4 transition-all duration-200 opacity-0">
   <div class="w-12 h-12 border-4 border-slate-200 border-t-brand-500 rounded-full animate-spin"></div>
   <p class="text-sm font-bold text-slate-700 font-mono tracking-wide uppercase">Memproses Perintah Engine...</p>
 </div>
 
+<!-- GLOBAL OVERLAYS -->
 <div id="sb-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[199] hidden transition-opacity duration-300 opacity-0" onclick="closeSidebar()"></div>
 
+<!-- RECONNECT BANNER -->
 <div id="reconnect-banner" class="fixed top-0 left-0 right-0 bg-yellow-500 text-white text-xs font-mono py-2 text-center z-[999] shadow-sm hidden items-center justify-center gap-2 font-medium">
   <i data-lucide="refresh-cw" class="w-3.5 h-3.5 animate-spin"></i>
   Koneksi Terputus! Mencoba menghubungkan kembali ke mesin WhatsApp...
@@ -77,6 +83,7 @@
 
 <div id="shell" class="flex min-h-screen">
 
+  <!-- ══════════════════ SIDEBAR ══════════════════ -->
   <aside id="sidebar" class="w-64 bg-white border-r border-panel-border flex flex-col fixed top-0 bottom-0 left-0 z-[200] transition-transform duration-300 -translate-x-full md:translate-x-0 shadow-sm">
     <div class="p-6 border-b border-panel-border flex items-center gap-3">
       <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-500 to-emerald-400 flex items-center justify-center shadow-md shadow-brand-glow text-white">
@@ -115,8 +122,10 @@
     </div>
   </aside>
 
+  <!-- ══════════════════ MAIN AREA ══════════════════ -->
   <div id="main" class="flex-1 md:ml-64 flex flex-col min-h-screen transition-all duration-300">
     
+    <!-- TOPBAR -->
     <header id="topbar" class="h-16 border-b border-panel-border bg-white/80 backdrop-blur-md sticky top-0 z-[100] px-6 flex items-center justify-between gap-4 shadow-sm">
       <div class="flex items-center gap-4">
         <button id="hamburger" onclick="toggleSidebar()" class="md:hidden p-2 rounded-lg text-panel-muted hover:bg-slate-100 transition-colors">
@@ -138,8 +147,10 @@
       </div>
     </header>
 
+    <!-- INNER CONTAINER -->
     <main id="content" class="p-6 max-w-7xl w-full mx-auto flex-1">
 
+      <!-- ════ PAGE: DASHBOARD ════ -->
       <div id="page-dashboard" class="page active space-y-6">
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div class="bg-white border border-panel-border rounded-2xl p-5 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
@@ -227,6 +238,7 @@
         </div>
       </div>
 
+      <!-- ════ PAGE: KAMPANYE ════ -->
       <div id="page-kampanye" class="page space-y-6">
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div class="lg:col-span-7 bg-white border border-panel-border rounded-2xl p-6 shadow-sm space-y-5">
@@ -311,6 +323,7 @@
         </div>
       </div>
 
+      <!-- ════ PAGE: TEMPLATE ════ -->
       <div id="page-template" class="page space-y-6">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div class="bg-white border border-panel-border rounded-2xl p-6 shadow-sm space-y-4 h-fit">
@@ -365,70 +378,72 @@
         </div>
       </div>
 
+      <!-- ════ PAGE: KONEKSI DEVICE (DUAL LOGIN) ════ -->
       <div id="page-koneksi" class="page space-y-6">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-4xl">
-          
-          <div class="bg-white border border-panel-border rounded-2xl p-6 shadow-sm space-y-4">
-            <div class="flex items-center gap-2 border-b border-slate-100 pb-3">
-              <i data-lucide="link-2" class="w-4 h-4 text-brand-600"></i>
-              <h3 class="text-sm font-bold text-slate-800">Opsi 1: Tautkan via Nomor (Pairing Code)</h3>
-            </div>
-            
-            <div id="alertKoneksi" class="p-4 rounded-xl text-xs font-semibold hidden"></div>
-            
-            <p class="text-xs text-panel-muted leading-relaxed">Masukkan kode negara di awal nomor (contoh: <code>628xxxx</code>). Buka WhatsApp -> Perangkat Tertaut -> Tautkan Perangkat.</p>
-
-            <div>
-              <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Nomor WhatsApp Gateway</label>
-              <div class="relative">
-                <input type="tel" id="pairPhone" placeholder="Contoh: 6282322791101" class="w-full bg-slate-50 border border-panel-border rounded-xl pl-10 pr-4 py-3 text-sm font-medium focus:border-brand-500 focus:ring-4 focus:ring-brand-glow outline-none transition-all text-slate-700 font-mono"/>
-                <i data-lucide="phone" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5"></i>
-              </div>
-            </div>
-
-            <button onclick="withLoading(requestPairing)" class="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white font-bold text-sm rounded-xl shadow-md shadow-brand-glow transition-all active:scale-[0.99] flex items-center justify-center gap-2">
-              <i data-lucide="fingerprint" class="w-4 h-4"></i> Generate Pairing Token
-            </button>
-
-            <div id="pairCodeBox" class="hidden bg-slate-900 text-white border border-slate-800 rounded-xl p-6 text-center shadow-inner relative overflow-hidden group">
-              <div class="text-[10px] font-mono tracking-widest text-slate-400 font-bold uppercase mb-2">Token Autentikasi WhatsApp</div>
-              <div id="pairCode" class="text-3xl font-mono font-bold tracking-[0.3em] text-brand-400 select-all py-2">——————</div>
-              <p class="text-[11px] text-slate-400 mt-2 leading-relaxed">Gunakan token di atas segera sebelum koneksi kedaluwarsa.</p>
-            </div>
-          </div>
-
-          <div class="bg-white border border-panel-border rounded-2xl p-6 shadow-sm flex flex-col items-center justify-center text-center space-y-4">
-            <div class="flex items-center gap-2 border-b border-slate-100 pb-3 w-full text-left">
-              <i data-lucide="qr-code" class="w-4 h-4 text-brand-600"></i>
-              <h3 class="text-sm font-bold text-slate-800">Opsi 2: Tautkan via Scan QR Code</h3>
-            </div>
-            <p class="text-xs text-panel-muted text-left w-full leading-relaxed">Arahkan kamera pemindai WhatsApp perangkat Anda langsung pada komponen visual QR Code di bawah ini:</p>
-            
-            <div id="qr-container" class="p-4 bg-slate-50 border border-panel-border rounded-2xl flex items-center justify-center min-h-[220px] min-w-[220px]">
-              <div id="qrcode" class="shadow-sm"></div>
-              <div id="qr-placeholder" class="text-xs text-panel-muted font-mono">Menunggu Stream QR Core...</div>
-            </div>
-          </div>
+        <!-- Tab Header Mode Pemilihan Login -->
+        <div class="flex border-b border-panel-border max-w-4xl">
+          <button id="tab-pairing" onclick="switchLoginTab('pairing')" class="px-6 py-2.5 text-sm font-bold border-b-2 border-brand-500 text-brand-600 transition-all flex items-center gap-2">
+            <i data-lucide="fingerprint" class="w-4 h-4"></i> Opsi 1: Pairing Code
+          </button>
+          <button id="tab-qr" onclick="switchLoginTab('qr')" class="px-6 py-2.5 text-sm font-semibold text-panel-muted border-b-2 border-transparent hover:text-slate-800 transition-all flex items-center gap-2">
+            <i data-lucide="qr-code" class="w-4 h-4"></i> Opsi 2: Scan QR Code
+          </button>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-4xl">
-          <div class="bg-white border border-panel-border rounded-2xl p-5 shadow-sm space-y-3">
-            <div class="text-[11px] font-mono tracking-wider font-bold text-slate-400 uppercase">State Sesi Kredensial</div>
-            <div class="flex items-center gap-4 bg-slate-50 border border-panel-border rounded-xl p-4">
-              <div id="sessDot" class="w-3 h-3 rounded-full bg-slate-300 shrink-0"></div>
-              <div class="min-w-0">
-                <div id="sessStatus" class="font-bold text-sm text-slate-700">Mencari Data...</div>
-                <div id="sessNum" class="text-xs font-mono text-panel-muted mt-0.5 truncate">—</div>
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-4xl">
+          <!-- AREA LOGIN PANEL -->
+          <div class="lg:col-span-7 bg-white border border-panel-border rounded-2xl p-6 shadow-sm min-h-[340px] flex flex-col justify-between">
+            <div id="alertKoneksi" class="p-4 rounded-xl text-xs font-semibold hidden mb-3"></div>
+            
+            <!-- PANEL 1: PAIRING CODE -->
+            <div id="pane-pairing" class="space-y-4">
+              <p class="text-xs text-panel-muted leading-relaxed">Masukkan nomor dengan format kode negara awal (contoh: <code>628xxxx</code>). Buka WhatsApp -> Perangkat Tertaut -> Tautkan dengan nomor telepon.</p>
+              <div>
+                <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Nomor WhatsApp Gateway</label>
+                <div class="relative">
+                  <input type="tel" id="pairPhone" placeholder="Contoh: 6282322791101" class="w-full bg-slate-50 border border-panel-border rounded-xl pl-10 pr-4 py-3 text-sm font-medium focus:border-brand-500 focus:ring-4 focus:ring-brand-glow outline-none transition-all text-slate-700 font-mono"/>
+                  <i data-lucide="phone" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5"></i>
+                </div>
+              </div>
+              <button onclick="withLoading(requestPairing)" class="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white font-bold text-sm rounded-xl shadow-md shadow-brand-glow transition-all active:scale-[0.99] flex items-center justify-center gap-2">
+                <i data-lucide="fingerprint" class="w-4 h-4"></i> Generate Pairing Token
+              </button>
+              <div id="pairCodeBox" class="hidden bg-slate-900 text-white border border-slate-800 rounded-xl p-6 text-center shadow-inner relative overflow-hidden">
+                <div class="text-[10px] font-mono tracking-widest text-slate-400 font-bold uppercase mb-2">Token Autentikasi WhatsApp</div>
+                <div id="pairCode" class="text-3xl font-mono font-bold tracking-[0.3em] text-brand-400 select-all py-2">——————</div>
+              </div>
+            </div>
+
+            <!-- PANEL 2: SCAN QR CODE -->
+            <div id="pane-qr" class="hidden space-y-4 flex flex-col items-center justify-center text-center">
+              <p class="text-xs text-panel-muted text-left w-full leading-relaxed">Buka aplikasi WhatsApp -> Perangkat Tertaut -> Tautkan Perangkat, lalu arahkan kamera pemindai HP langsung ke area QR Code berikut:</p>
+              <div id="qr-container" class="p-4 bg-slate-50 border border-panel-border rounded-2xl flex items-center justify-center min-h-[220px] min-w-[220px]">
+                <div id="qrcode" class="shadow-sm"></div>
+                <div id="qr-placeholder" class="text-xs text-panel-muted font-mono">Menunggu Jalur Stream QR Code...</div>
               </div>
             </div>
           </div>
 
-          <div class="bg-white border border-panel-border rounded-2xl p-5 shadow-sm space-y-3">
-            <div class="text-[11px] font-mono tracking-wider font-bold text-slate-400 uppercase">Manajemen Sesi</div>
-            <button onclick="withLoading(confirmLogout)" class="w-full py-2.5 px-4 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs rounded-xl border border-rose-200 transition-all active:scale-[0.99] flex items-center justify-center gap-2">
-              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Bersihkan Sesi &amp; Hapus Cache Kunci
-            </button>
-            <p class="text-[10px] text-panel-muted leading-relaxed">Menghapus file <code>auth_info</code> secara paksa untuk memaksa pembuatan ulang token koneksi baru.</p>
+          <!-- AREA METADATA SESI -->
+          <div class="lg:col-span-5 space-y-4">
+            <div class="bg-white border border-panel-border rounded-2xl p-5 shadow-sm space-y-3">
+              <div class="text-[11px] font-mono tracking-wider font-bold text-slate-400 uppercase">State Sesi Kredensial</div>
+              <div class="flex items-center gap-4 bg-slate-50 border border-panel-border rounded-xl p-4">
+                <div id="sessDot" class="w-3 h-3 rounded-full bg-slate-300 shrink-0"></div>
+                <div class="min-w-0">
+                  <div id="sessStatus" class="font-bold text-sm text-slate-700">Mencari Data...</div>
+                  <div id="sessNum" class="text-xs font-mono text-panel-muted mt-0.5 truncate">—</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-white border border-panel-border rounded-2xl p-5 shadow-sm space-y-3">
+              <div class="text-[11px] font-mono tracking-wider font-bold text-slate-400 uppercase">Manajemen Sesi</div>
+              <button onclick="withLoading(confirmLogout)" class="w-full py-2.5 px-4 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs rounded-xl border border-rose-200 transition-all active:scale-[0.99] flex items-center justify-center gap-2">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Bersihkan Sesi &amp; Hapus Cache Kunci
+              </button>
+              <p class="text-[10px] text-panel-muted leading-relaxed">Menghapus file <code>auth_info</code> secara paksa untuk memaksa pembuatan ulang token koneksi baru.</p>
+            </div>
           </div>
         </div>
       </div>
@@ -470,13 +485,13 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ══════════════════════════════════════
-// GLOBAL ASYNC OVERLOAD LOCKER
+// GLOBAL ASYNC OVERLOAD LOCKER (SCREEN BLOCKER)
 // ══════════════════════════════════════
 async function withLoading(asyncFn) {
   const loader = document.getElementById('global-loader');
-  const allControls = document.querySelectorAll('button, select, input, textarea, [onclick]');
+  const allControls = document.querySelectorAll('button, select, input, textarea');
   
-  // Amankan halaman dengan screen locker & disable komponen interaktif
+  // Kunci layar penuh, naikkan opacity, & matikan kontrol navigasi klik
   loader.classList.remove('hidden');
   loader.classList.add('flex');
   setTimeout(() => loader.classList.add('opacity-100'), 5);
@@ -485,14 +500,14 @@ async function withLoading(asyncFn) {
   try {
     await asyncFn();
   } catch (err) {
-    console.error("Overload Execution Interrupted: ", err);
+    console.error("Overload Process Error: ", err);
   } finally {
-    // Kembalikan state kontrol ke sedia kala
+    // Turunkan opacity & buka kembali kunci layar
     loader.classList.remove('opacity-100');
     setTimeout(() => { loader.classList.remove('flex'); loader.classList.add('hidden'); }, 200);
     allControls.forEach(ctrl => ctrl.disabled = false);
     
-    // Validasi ulang button trigger blast internal berdasarkan isi record antrean
+    // Evaluasi tombol trigger kirim pesan berdasarkan isi record database
     if (ST.total > 0 && (ST.sent + ST.failed + ST.skip < ST.total)) {
       document.getElementById('btnBlast').disabled = false;
     }
@@ -513,17 +528,24 @@ function setupUIEventListeners() {
       }
     });
   }
+}
 
-  const dz = document.getElementById('dropzone');
-  if (dz) {
-    dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('bg-brand-50/40', 'border-brand-500'); });
-    dz.addEventListener('dragleave', () => dz.classList.remove('bg-brand-50/40', 'border-brand-500'));
-    dz.addEventListener('drop', e => {
-      e.preventDefault();
-      dz.classList.remove('bg-brand-50/40', 'border-brand-500');
-      const f = e.dataTransfer.files[0];
-      if (f?.name.endsWith('.txt')) { selectedFile = f; document.getElementById('dzFile').textContent = f.name; }
-    });
+function switchLoginTab(mode) {
+  const tabPairing = document.getElementById('tab-pairing');
+  const tabQr = document.getElementById('tab-qr');
+  const panePairing = document.getElementById('pane-pairing');
+  const paneQr = document.getElementById('pane-qr');
+
+  if (mode === 'pairing') {
+    tabPairing.className = "px-6 py-2.5 text-sm font-bold border-b-2 border-brand-500 text-brand-600 transition-all flex items-center gap-2";
+    tabQr.className = "px-6 py-2.5 text-sm font-semibold text-panel-muted border-b-2 border-transparent hover:text-slate-800 transition-all flex items-center gap-2";
+    panePairing.classList.remove('hidden');
+    paneQr.classList.add('hidden');
+  } else {
+    tabQr.className = "px-6 py-2.5 text-sm font-bold border-b-2 border-brand-500 text-brand-600 transition-all flex items-center gap-2";
+    tabPairing.className = "px-6 py-2.5 text-sm font-semibold text-panel-muted border-b-2 border-transparent hover:text-slate-800 transition-all flex items-center gap-2";
+    paneQr.classList.remove('hidden');
+    panePairing.classList.add('hidden');
   }
 }
 
@@ -536,7 +558,7 @@ socket.on('wa-status', ({ connected, status, number, qr }) => {
 });
 
 socket.on('wa-qr', ({ qr }) => {
-  if (!ST.isBlasting) handleQrRender(qr);
+  if (!isConnected) handleQrRender(qr);
 });
 
 socket.on('terminal-log', ({ ts, msg, type }) => {
@@ -640,10 +662,10 @@ function updateWaUI(connected, status, number) {
     sStat.textContent = 'Terhubung Terotentikasi';
     sStat.className = "font-bold text-sm text-emerald-700";
     sNum.textContent = number || '—';
-    
+
     document.getElementById('qrcode').innerHTML = '';
     document.getElementById('qr-placeholder').style.display = 'block';
-    document.getElementById('qr-placeholder').textContent = 'Sesi Terkoneksi!';
+    document.getElementById('qr-placeholder').textContent = 'Sesi Terkoneksi Aktif!';
   } else if (status === 'connecting' || status === 'reconnecting') {
     pill.classList.add('border-yellow-200', 'bg-yellow-50/30');
     dot.classList.add('bg-yellow-500', 'pulse-glow');
@@ -704,7 +726,7 @@ function updateProgress() {
 }
 
 // ══════════════════════════════════════
-// DATA LOG RENDERING PIPELINE
+// DATA LOG RENDERING
 // ══════════════════════════════════════
 function addLogRow(id, phone, status) {
   const tbody = document.getElementById('logBody');
@@ -788,7 +810,7 @@ function closeSidebar() {
 }
 
 // ══════════════════════════════════════
-// DATA LOGIC TRANSMISSION
+// API ACTIONS
 // ══════════════════════════════════════
 async function requestPairing() {
   const phone = document.getElementById('pairPhone').value.trim();
@@ -814,9 +836,6 @@ function confirmLogout() {
   });
 }
 
-// ══════════════════════════════════════
-// TEMPLATE STORAGE INTERACTIONS
-// ══════════════════════════════════════
 async function loadTemplates() {
   const data = await api('/api/templates');
   const list = document.getElementById('templateList');
@@ -899,9 +918,6 @@ async function loadTemplateOptions() {
   });
 }
 
-// ══════════════════════════════════════
-// BULK CAMPAIGN SCHEDULERS ENGINE
-// ══════════════════════════════════════
 function onFileSelect(e) {
   selectedFile = e.target.files[0];
   document.getElementById('dzFile').textContent = selectedFile ? `Terpilih: ${selectedFile.name}` : '';
@@ -914,7 +930,6 @@ async function uploadKampanye() {
   if (!link) return showAlert('alertKampanye', 'Payload URL promosi wajib dilampirkan.', 'error');
   if (!selectedFile) return showAlert('alertKampanye', 'Berkas database nomor (.txt) tidak ditemukan.', 'error');
 
-  const btn = document.getElementById('btnUpload');
   const fd = new FormData();
   fd.append('file', selectedFile);
   fd.append('messageTemplate', tpl);
@@ -989,9 +1004,6 @@ function openModal(title, msg, cb) {
   document.getElementById('modalConfirm').onclick = () => { closeModal(); _modalCb && _modalCb(); };
 }
 
-// ══════════════════════════════════════
-// INTERACTIVE UTILITY HELPERS
-// ══════════════════════════════════════
 function closeModal() {
   const m = document.getElementById('modalOverlay');
   m.classList.remove('opacity-100');
@@ -1027,13 +1039,6 @@ async function api(url, method = 'GET', body) {
 function esc(str) { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function b64(str) { return btoa(unescape(encodeURIComponent(str))); }
 function now() { return new Date().toLocaleTimeString('id-ID'); }
-
-const PAGE_META = {
-  dashboard: ['Dashboard Overview', 'Ringkasan performa distribusi pesan'],
-  kampanye: ['Management Kampanye', 'Upload database target & jalankan pengiriman massal'],
-  template: ['Kompilasi Template', 'Kelola repositori data teks dinamis spintax'],
-  koneksi: ['Integrasi Device', 'Konfigurasi sinkronisasi token gateway WhatsApp'],
-};
 </script>
 </body>
 </html>
