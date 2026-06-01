@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PANSA GROUP — Gateway Core Dashboard</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'], mono: ['"JetBrains Mono"', 'monospace'] },
+        colors: { brand: { 50: '#f0fdf4', 100: '#dcfce7', 500: '#10b981', 600: '#059669' }, panel: { bg: '#f8fafc', card: '#ffffff', border: '#e2e8f0', text: '#0f172a', muted: '#64748b' } }
+      }
+    }
+  }
+</script>
+
+<style>
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; }
+  .page { display: none; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+  .page.active { display: block; }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(16px); backdrop-filter: blur(0px); } to { opacity: 1; transform: translateY(0); backdrop-filter: blur(4px); } }
+  .pulse-glow { animation: pulseGlow 2s infinite ease-in-out; }
+  @keyframes pulseGlow { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); } 50% { opacity: 0.6; box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); } }
+</style>
+</head>
+<body class="bg-panel-bg text-panel-text font-sans min-h-screen antialiased">
+
+<div id="global-loader" class="fixed inset-0 bg-white/70 backdrop-blur-md z-[9999] hidden items-center justify-center flex-col gap-4 transition-all duration-200 opacity-0">
+  <div class="w-12 h-12 border-4 border-slate-200 border-t-brand-500 rounded-full animate-spin"></div>
+  <p class="text-xs font-bold text-slate-700 font-mono tracking-widest uppercase">Executing Network Task...</p>
+</div>
+
+<div id="sb-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[199] hidden transition-all duration-300 opacity-0" onclick="closeSidebar()"></div>
+
+<div id="shell" class="flex min-h-screen">
+  <aside id="sidebar" class="w-64 bg-white border-r border-panel-border flex flex-col fixed top-0 bottom-0 left-0 z-[200] transition-transform duration-300 -translate-x-full md:translate-x-0 shadow-sm">
+    <div class="p-6 border-b border-panel-border flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-500 to-emerald-400 flex items-center justify-center text-white font-bold text-lg shadow-md shadow-brand-glow">P</div>
+      <div><div class="font-extrabold text-sm tracking-tight text-slate-800">PANSA GROUP</div><div class="text-[10px] font-mono text-panel-muted tracking-wider uppercase">Engine Platform</div></div>
+    </div>
+    <div class="text-[10px] font-mono font-bold uppercase tracking-widest text-slate-400 px-6 pt-6 pb-2">Menu Navigasi</div>
+    <nav class="flex-1 px-4 flex flex-col gap-1">
+      <button onclick="nav(this,'dashboard')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-brand-600 bg-brand-50 border border-transparent transition-all active"><i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard Console</button>
+      <button onclick="nav(this,'kampanye')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-panel-muted border border-transparent transition-all"><i data-lucide="rocket" class="w-4 h-4"></i> Eksekusi Kampanye</button>
+      <button onclick="nav(this,'template')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-panel-muted border border-transparent transition-all"><i data-lucide="file-text" class="w-4 h-4"></i> Kelola Template</button>
+      <button onclick="nav(this,'koneksi')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-panel-muted border border-transparent transition-all"><i data-lucide="smartphone" class="w-4 h-4"></i> Integrasi Device</button>
+    </nav>
+  </aside>
+
+  <div id="main" class="flex-1 md:ml-64 flex flex-col min-h-screen">
+    <header class="h-16 border-b border-panel-border bg-white/80 backdrop-blur-md sticky top-0 z-[100] px-6 flex items-center justify-between shadow-sm">
+      <div class="flex items-center gap-4">
+        <button onclick="toggleSidebar()" class="md:hidden p-2 rounded-lg text-panel-muted hover:bg-slate-100"><i data-lucide="menu" class="w-5 h-5"></i></button>
+        <div><h1 id="topTitle" class="font-bold text-base text-slate-800">Dashboard Console</h1><p id="topSub" class="text-xs text-panel-muted">Ringkasan performa kluster sistem</p></div>
+      </div>
+    </header>
+
+    <main class="p-6 max-w-7xl w-full mx-auto flex-1">
+      
+      <div id="page-dashboard" class="page active space-y-6">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="bg-white border rounded-2xl p-5 shadow-sm relative overflow-hidden">
+            <div id="s-total" class="text-3xl font-bold font-mono text-slate-800 mt-2">0</div>
+            <p class="text-xs font-semibold text-panel-muted mt-1">Total Database</p>
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-slate-300"></div>
+          </div>
+          <div class="bg-white border rounded-2xl p-5 shadow-sm relative overflow-hidden">
+            <div id="s-sent" class="text-3xl font-bold font-mono text-emerald-600 mt-2">0</div>
+            <p class="text-xs font-semibold text-panel-muted mt-1">Sukses Kirim</p>
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500"></div>
+          </div>
+          <div class="bg-white border rounded-2xl p-5 shadow-sm relative overflow-hidden">
+            <div id="s-failed" class="text-3xl font-bold font-mono text-rose-600 mt-2">0</div>
+            <p class="text-xs font-semibold text-panel-muted mt-1">Gagal Node</p>
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-rose-500"></div>
+          </div>
+          <div class="bg-white border rounded-2xl p-5 shadow-sm relative overflow-hidden">
+            <div id="s-skip" class="text-3xl font-bold font-mono text-amber-500 mt-2">0</div>
+            <p class="text-xs font-semibold text-panel-muted mt-1">Bukan WhatsApp</p>
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-amber-500"></div>
+          </div>
+        </div>
+
+        <div class="bg-white border border-panel-border rounded-2xl p-6 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-bold text-slate-700">Progress Transaksi Pengiriman</h3>
+            <span id="blastStatusPill" class="text-xs font-mono px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 font-bold border">Idle</span>
+          </div>
+          <div class="h-3 w-full bg-slate-100 rounded-full overflow-hidden border">
+            <div id="progressBar" class="h-full bg-gradient-to-r from-brand-500 to-emerald-400 rounded-full transition-all duration-500" style="width: 0%"></div>
+          </div>
+          <div class="flex items-center justify-between text-xs font-mono font-bold text-panel-muted mt-2">
+            <span id="progressText">0 / 0 Target</span><span id="progressPct" class="text-brand-600">0%</span>
+          </div>
+        </div>
+
+        <div class="bg-white border border-panel-border rounded-2xl shadow-sm overflow-hidden">
+          <div class="p-5 border-b border-panel-border flex items-center justify-between bg-slate-50/50">
+            <h3 class="text-sm font-bold text-slate-700">Realtime Stream Logs</h3>
+            <button onclick="clearLog()" class="p-2 text-slate-400 hover:text-red-500 transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+          </div>
+          <div class="overflow-x-auto max-h-[350px]">
+            <table class="w-full text-left border-collapse">
+              <thead class="bg-slate-50 text-[10px] font-mono uppercase font-bold text-panel-muted border-b">
+                <tr><th class="py-3 px-6">Row</th><th class="py-3 px-6">Identitas Penerima</th><th class="py-3 px-6">Status Delivery</th><th class="py-3 px-6">Timestamp</th></tr>
+              </thead>
+              <tbody id="logBody" class="divide-y divide-slate-100 text-sm">
+                <tr><td colspan="4" class="py-12 text-center text-panel-muted font-medium">Log stream kosong. Silakan unggah database.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="page-kampanye" class="page space-y-6">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div class="lg:col-span-7 bg-white border rounded-2xl p-6 shadow-sm space-y-5">
+            <div id="alertKampanye" class="p-4 rounded-xl text-xs font-semibold hidden"></div>
+            <div>
+              <label class="block text-xs font-bold text-slate-600 uppercase mb-2">Pilih Kompilasi Template</label>
+              <select id="selectTemplate" class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm outline-none font-medium"></select>
+            </div>
+            <div id="tplPreviewBox" class="hidden"><div class="bg-slate-50 border border-dashed rounded-xl p-4 text-xs font-mono text-slate-600 whitespace-pre-wrap"></div></div>
+            <div>
+              <label class="block text-xs font-bold text-slate-600 uppercase mb-2">Payload URL Promosi</label>
+              <input type="text" id="targetLink" placeholder="https://pansa.group/diskon" class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm outline-none font-medium"/>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-600 uppercase mb-2">Database Kontak Target (.txt)</label>
+              <div id="dropzone" class="border-2 border-dashed border-slate-200 bg-slate-50/50 rounded-2xl p-8 text-center cursor-pointer relative group">
+                <input type="file" id="fileInput" accept=".txt" onchange="onFileSelect(event)" class="absolute inset-0 opacity-0 cursor-pointer z-10"/>
+                <p class="text-sm font-bold text-slate-700">Drag &amp; Drop berkas target, atau <span class="text-brand-600">Cari File</span></p>
+                <div id="dzFile" class="text-xs font-mono text-brand-600 mt-2 font-bold"></div>
+              </div>
+            </div>
+            <button id="btnUpload" onclick="withLoading(uploadKampanye)" class="w-full py-3 px-6 bg-brand-500 hover:bg-brand-600 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-sm"><i data-lucide="upload-cloud" class="w-4 h-4"></i> Sinkronisasi Komponen Data</button>
+          </div>
+
+          <div class="lg:col-span-5 space-y-6">
+            <div class="bg-white border rounded-2xl p-6 shadow-sm space-y-4">
+              <div class="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                <div id="kProgressBar" class="h-full bg-brand-500 rounded-full" style="width: 0%"></div>
+              </div>
+              <div class="flex items-center justify-between text-[11px] font-mono font-bold text-panel-muted">
+                <span id="kProgressText">0 / 0 Done</span><span id="kProgressPct">0%</span>
+              </div>
+              <div class="flex gap-3">
+                <button id="btnBlast" onclick="withLoading(startBlast)" disabled class="flex-1 py-3.5 bg-brand-500 hover:bg-brand-600 text-white font-extrabold text-sm rounded-xl disabled:bg-slate-100 disabled:text-slate-400 flex items-center justify-center gap-2"><i data-lucide="play" class="w-4 h-4"></i> Mulai Blast</button>
+                <button id="btnStop" onclick="withLoading(stopBlast)" class="flex-1 py-3.5 bg-rose-500 hover:bg-rose-600 text-white font-extrabold text-sm rounded-xl hidden items-center justify-center gap-2"><i data-lucide="square" class="w-4 h-4"></i> Stop</button>
+              </div>
+              <button onclick="withLoading(resetBlast)" class="w-full py-2 border text-slate-500 font-semibold text-xs rounded-xl hover:bg-slate-50 transition-all">Wipe Antrean</button>
+            </div>
+            <div class="bg-white border rounded-2xl p-6 shadow-sm flex flex-col h-56 overflow-hidden">
+              <div id="terminal" class="flex-1 bg-slate-900 rounded-xl p-4 font-mono text-[11px] text-slate-300 overflow-y-auto space-y-1.5">
+                <div class="flex gap-2"><span class="text-slate-500 shrink-0">--:--:--</span><span class="text-cyan-400">// Engine boot ready...</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="page-template" class="page space-y-6">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-white border rounded-2xl p-6 shadow-sm space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b">
+              <h3 id="tplFormTitle" class="text-sm font-bold text-slate-800">Simpan Template Baru</h3>
+              <button id="btnCancelEdit" onclick="cancelEdit()" class="hidden text-xs text-slate-400">Cancel</button>
+            </div>
+            <input type="hidden" id="editTplId"/>
+            <div id="alertTemplate" class="p-4 rounded-xl text-xs font-semibold hidden"></div>
+            <div>
+              <label class="block text-xs font-bold text-slate-600 uppercase mb-2">Judul Template</label>
+              <input type="text" id="tplTitle" placeholder="cth: Gimmick Diskon" class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm outline-none"/>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-600 uppercase mb-2">Struktur Konten</label>
+              <textarea id="tplContent" placeholder="[Halo|Hai] kak, promo di [Link]" class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm outline-none min-h-[120px] resize-y"></textarea>
+            </div>
+            <button id="btnSaveTpl" onclick="withLoading(saveTemplate)" class="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white font-bold text-sm rounded-xl">Simpan ke Repositori</button>
+          </div>
+          <div class="bg-white border rounded-2xl p-6 shadow-sm flex flex-col">
+            <div class="flex items-center justify-between pb-2 border-b mb-4">
+              <h3 class="text-sm font-bold text-slate-800">Daftar Repositori</h3>
+              <span id="tplCount" class="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-500">0 Item</span>
+            </div>
+            <div id="templateList" class="space-y-3 max-h-[400px] overflow-y-auto"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="page-koneksi" class="page space-y-6">
+        <div class="flex items-center justify-between bg-white border p-4 rounded-2xl shadow-sm">
+          <div><h2 class="text-sm font-bold text-slate-800">Cluster Jaringan Gateway</h2><p class="text-xs text-panel-muted">Kelola multi-folder session otomatis</p></div>
+          <button onclick="withLoading(createNewDeviceSession)" class="py-2.5 px-4 bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold rounded-xl shadow-md flex items-center gap-2 transition-all"><i data-lucide="plus-circle" class="w-4 h-4"></i> Tambah WhatsApp</button>
+        </div>
+        <div id="devices-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<div id="connectModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[999] hidden items-center justify-center p-4 opacity-0 transition-opacity duration-200">
+  <div class="bg-white border rounded-2xl w-full max-w-md shadow-xl overflow-hidden scale-95 transition-transform duration-200">
+    <div class="p-5 border-b flex items-center justify-between bg-slate-50/50">
+      <div><h4 class="font-bold text-slate-800 text-sm">Integrasi Perangkat</h4><p id="modal-session-id" class="text-[10px] font-mono text-panel-muted font-bold mt-0.5">SESSION ID: —</p></div>
+      <button onclick="closeConnectModal()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-4 h-4"></i></button>
+    </div>
+    <div class="p-6 space-y-5">
+      <div class="flex bg-slate-100 p-1 rounded-xl">
+        <button id="m-btn-qr" onclick="toggleModalMethod('qr')" class="flex-1 py-2 text-xs font-bold rounded-lg bg-white shadow-sm text-slate-800 transition-all">Scan QR Code</button>
+        <button id="m-btn-pairing" onclick="toggleModalMethod('pairing')" class="flex-1 py-2 text-xs font-semibold rounded-lg text-panel-muted hover:text-slate-800 transition-all">Pairing Code</button>
+      </div>
+      <div id="m-pane-qr" class="flex flex-col items-center justify-center py-4 space-y-3">
+        <div id="modal-qrcode" class="p-3 bg-white border rounded-xl shadow-inner min-h-[200px] min-w-[200px] flex items-center justify-center"></div>
+        <p class="text-xs text-panel-muted font-mono" id="qr-modal-placeholder">Menunggu String Matrix Server...</p>
+      </div>
+      <div id="m-pane-pairing" class="hidden space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-600 uppercase mb-2">Nomor Telepon Gateway</label>
+          <input type="tel" id="m-pair-phone" placeholder="Contoh: 6282322791101" class="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-mono outline-none"/>
+        </div>
+        <button onclick="submitPairingRequest()" class="w-full py-2.5 bg-brand-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2"><i data-lucide="fingerprint" class="w-4 h-4"></i> Generate Pairing Token</button>
+        <div id="m-pair-box" class="hidden bg-slate-900 text-white rounded-xl p-5 text-center font-mono">
+          <div id="m-pair-code" class="text-2xl font-bold tracking-[0.25em] text-brand-400 select-all">——————</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="modalOverlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[999] hidden items-center justify-center p-4 opacity-0 transition-opacity duration-200" onclick="if(event.target===this) closeModal()">
+  <div class="bg-white border rounded-2xl w-full max-w-md shadow-xl overflow-hidden scale-95 transition-transform duration-200">
+    <div class="p-5 border-b flex items-center justify-between bg-slate-50/50"><h4 id="modalTitle" class="font-bold text-slate-800 text-sm">Konfirmasi</h4></div>
+    <div class="p-6 space-y-4">
+      <p id="modalMsg" class="text-sm text-slate-600 leading-relaxed"></p>
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button onclick="closeModal()" class="px-4 py-2 text-xs font-bold text-slate-500 border rounded-xl hover:bg-slate-50">Batal</button>
+        <button id="modalConfirm" class="px-4 py-2 text-xs font-bold text-white bg-rose-500 hover:bg-rose-600 rounded-xl">Eksekusi</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const socket = io();
+let ST = { total: 0, sent: 0, failed: 0, skip: 0 };
+let rowCount = 0; let selectedFile = null;
+const alertTimers = {}; let _modalCb = null;
+let currentModalSessionId = null; let activeModalMethod = 'qr';
+
+// Simpan data awal template yang dipasok oleh EJS saat boot pertama
+const initialTemplatesFromServer = <%- JSON.stringify(initialTemplates) %>;
+
+document.addEventListener('DOMContentLoaded', () => {
+  lucide.createIcons();
+  setupUIEventListeners();
+  renderTemplates(initialTemplatesFromServer);
+});
+
+async function withLoading(asyncFn) {
+  const loader = document.getElementById('global-loader');
+  const ctrls = document.querySelectorAll('button, input, select, textarea');
+  loader.classList.remove('hidden'); loader.classList.add('flex');
+  setTimeout(() => loader.classList.add('opacity-100'), 5);
+  ctrls.forEach(c => c.disabled = true);
+  try { await asyncFn(); } catch(e) { console.error(e); } finally {
+    loader.classList.remove('opacity-100');
+    setTimeout(() => { loader.classList.remove('flex'); loader.classList.add('hidden'); }, 200);
+    ctrls.forEach(c => c.disabled = false);
+    if (ST.total > 0 && (ST.sent + ST.failed + ST.skip < ST.total)) {
+      document.getElementById('btnBlast').disabled = false;
+    }
+  }
+}
+
+// ══════════════════════════════════════
+// DYNAMIC MULTI-SESSION DRIVER
+// ══════════════════════════════════════
+async function createNewDeviceSession() {
+  const res = await api('/api/create-session', 'POST');
+  if(res.success) {
+    await fetchAndRenderDevices();
+    openConnectWizard(res.sessionId);
+  }
+}
+
+async function fetchAndRenderDevices() {
+  const devices = await api('/api/wa-sessions');
+  const grid = document.getElementById('devices-grid');
+  grid.innerHTML = '';
+  if(!devices.length) {
+    grid.innerHTML = `<div class="col-span-full text-center py-12 text-panel-muted bg-white border rounded-2xl"><p class="text-xs font-medium">Belum ada infrastruktur cluster session terdaftar.</p></div>`;
+    return;
+  }
+  devices.forEach(d => {
+    const card = document.createElement('div');
+    card.className = "bg-white border rounded-2xl p-5 shadow-sm space-y-4 flex flex-col justify-between";
+    const dotCls = d.connected ? 'bg-brand-500 shadow-[0_0_8px_#10b981]' : 'bg-slate-300';
+    card.innerHTML = `
+      <div class="flex items-center justify-between border-b pb-2">
+        <div><h4 class="font-bold text-slate-800 font-mono text-sm uppercase">${d.sessionId}</h4><p class="text-[11px] text-panel-muted font-mono mt-0.5">${d.number || '—'}</p></div>
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${d.connected?'bg-brand-50 text-brand-600 border border-brand-200':'bg-slate-50 text-slate-500'}"><span class="w-2 h-2 rounded-full ${dotCls}"></span>${d.connected?'Connected':'Offline'}</span>
+      </div>
+      <div class="flex gap-2 pt-2">
+        ${!d.connected ? `<button onclick="openConnectWizard('${d.sessionId}')" class="flex-1 py-2 border rounded-xl font-bold text-xs bg-slate-50 hover:bg-slate-100 flex items-center justify-center gap-1.5">Tautkan Perangkat</button>` : ''}
+        <button onclick="deleteDeviceSession('${d.sessionId}')" class="py-2 px-3 border border-rose-200 text-rose-500 rounded-xl hover:bg-rose-50 transition-all">Hapus Sesi</button>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function openConnectWizard(sessionId) {
+  currentModalSessionId = sessionId;
+  document.getElementById('modal-session-id').textContent = `SESSION ID: ${sessionId}`;
+  document.getElementById('modal-qrcode').innerHTML = '';
+  document.getElementById('m-pair-box').classList.add('hidden');
+  document.getElementById('m-pair-phone').value = '';
+  document.getElementById('qr-modal-placeholder').style.display = 'block';
+  
+  const m = document.getElementById('connectModal');
+  m.classList.remove('hidden'); m.classList.add('flex');
+  setTimeout(() => { m.classList.add('opacity-100'); m.querySelector('div').classList.remove('scale-95'); }, 5);
+}
+
+function closeConnectModal() {
+  const m = document.getElementById('connectModal');
+  m.classList.remove('opacity-100'); m.querySelector('div').classList.add('scale-95');
+  setTimeout(() => { m.classList.remove('flex'); m.classList.add('hidden'); }, 200);
+  currentModalSessionId = null;
+  withLoading(fetchAndRenderDevices);
+}
+
+function toggleModalMethod(method) {
+  activeModalMethod = method;
+  const bQr = document.getElementById('m-btn-qr'); const bPair = document.getElementById('m-btn-pairing');
+  const pQr = document.getElementById('m-pane-qr'); const pPair = document.getElementById('m-pane-pairing');
+  if(method === 'qr') {
+    bQr.className = "flex-1 py-2 text-xs font-bold rounded-lg bg-white shadow-sm text-slate-800";
+    bPair.className = "flex-1 py-2 text-xs font-semibold rounded-lg text-panel-muted";
+    pQr.classList.remove('hidden'); pPair.classList.add('hidden');
+  } else {
+    bPair.className = "flex-1 py-2 text-xs font-bold rounded-lg bg-white shadow-sm text-slate-800";
+    bQr.className = "flex-1 py-2 text-xs font-semibold rounded-lg text-panel-muted";
+    pPair.classList.remove('hidden'); pQr.classList.add('hidden');
+  }
+}
+
+async function submitPairingRequest() {
+  const phone = document.getElementById('m-pair-phone').value.trim();
+  if(!phone) return;
+  const res = await api('/api/request-pairing', 'POST', { sessionId: currentModalSessionId, phone });
+  if(res.code) {
+    document.getElementById('m-pair-box').classList.remove('hidden');
+    document.getElementById('m-pair-code').textContent = res.code;
+  }
+}
+
+function deleteDeviceSession(sessionId) {
+  openModal('Hapus Sesi Perangkat', `Apakah Anda yakin ingin mematikan koneksi dan menghapus folder session ${sessionId}?`, async () => {
+    await api('/api/logout', 'POST', { sessionId });
+  });
+}
+
+// ══════════════════════════════════════
+// WEB SOCKET LIVE INTERFACES
+// ══════════════════════════════════════
+socket.on('wa-qr-update', ({ sessionId, qr }) => {
+  if(currentModalSessionId === sessionId && activeModalMethod === 'qr') {
+    document.getElementById('qr-modal-placeholder').style.display = 'none';
+    const qrDiv = document.getElementById('modal-qrcode'); qrDiv.innerHTML = '';
+    new QRCode(qrDiv, { text: qr, width: 180, height: 180, colorDark : "#0f172a", correctLevel : QRCode.CorrectLevel.H });
+  }
+});
+socket.on('wa-instance-status', () => { fetchAndRenderDevices(); });
+socket.on('wa-instance-deleted', () => { fetchAndRenderDevices(); });
+
+socket.on('blast-ready', ({ total }) => {
+  ST = { total, sent: 0, failed: 0, skip: 0 }; updateStats(); updateProgress();
+  document.getElementById('btnBlast').disabled = false;
+  showAlert('alertKampanye', `${total} kontak termuat ke antrean.`, 'success');
+});
+socket.on('blast-started', () => {
+  document.getElementById('btnBlast').classList.add('hidden');
+  document.getElementById('btnStop').classList.remove('hidden');
+  document.getElementById('blastStatusPill').innerHTML = 'Running';
+});
+socket.on('blast-update', ({ id, phone_number, status }) => {
+  addLogRow(id, phone_number, status);
+  if (status === 'sent') ST.sent++;
+  else if (status === 'failed') ST.failed++;
+  else if (status === 'not_registered') ST.skip++;
+  updateStats(); updateProgress();
+});
+socket.on('blast-finished', () => {
+  document.getElementById('btnBlast').classList.remove('hidden');
+  document.getElementById('btnStop').classList.add('hidden');
+  document.getElementById('btnBlast').disabled = true;
+  document.getElementById('blastStatusPill').innerHTML = 'Selesai';
+});
+socket.on('blast-reset', () => {
+  ST = { total: 0, sent: 0, failed: 0, skip: 0 }; updateStats(); updateProgress();
+  document.getElementById('logBody').innerHTML = '<tr><td colspan="4" class="py-12 text-center text-panel-muted font-medium">Log stream kosong. Silakan unggah database.</td></tr>';
+  document.getElementById('btnBlast').disabled = true;
+  document.getElementById('blastStatusPill').innerHTML = 'Idle';
+});
+socket.on('terminal-log', ({ ts, msg, type }) => {
+  const t = document.getElementById('terminal'); const el = document.createElement('div'); el.className = 'flex gap-2';
+  const colors = { ok: 'text-emerald-400', err: 'text-rose-400', warn: 'text-amber-400', info: 'text-slate-400' };
+  el.innerHTML = `<span class="text-slate-500 select-none">${ts}</span><span class="${colors[type]||'text-slate-300'}">${esc(msg)}</span>`;
+  t.appendChild(el); t.scrollTop = t.scrollHeight;
+});
+
+// SPA SINGLE PAGE APPLICATION CLIENT-SIDE ROUTER ENGINE
+function nav(el, name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.className = 'nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-panel-muted border border-transparent transition-all');
+  document.getElementById('page-' + name).classList.add('active');
+  el.className = 'nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-brand-600 border border-transparent transition-all bg-brand-50';
+  if(name === 'koneksi') withLoading(fetchAndRenderDevices);
+  closeSidebar();
+}
+
+// TEMPLATE LOGIC MANAGERS
+function renderTemplates(data) {
+  const list = document.getElementById('templateList');
+  document.getElementById('tplCount').textContent = data.length + ' Item';
+  if (!data.length) { list.innerHTML = '<p class="text-xs text-center text-panel-muted py-8">Belum ada template.</p>'; return; }
+  list.innerHTML = data.map(t => `
+    <div class="bg-slate-50 border rounded-xl p-4 flex items-start justify-between gap-4">
+      <div class="min-w-0 flex-1"><h4 class="font-bold text-sm text-slate-800 truncate">${esc(t.title)}</h4><p class="text-xs text-panel-muted truncate mt-1">${esc(t.content)}</p></div>
+      <div class="flex items-center gap-1 shrink-0">
+        <button class="p-1 text-slate-400 hover:text-brand-600" onclick="editTemplate(${t.id},'${b64(t.title)}','${b64(t.content)}')">Edit</button>
+        <button class="p-1 text-slate-400 hover:text-rose-600" onclick="deleteTpl(${t.id})">Hapus</button>
+      </div>
+    </div>
+  `).join('');
+}
+async function loadTemplates() { const data = await api('/api/templates'); renderTemplates(data); }
+async function saveTemplate() {
+  const id = document.getElementById('editTplId').value; const title = document.getElementById('tplTitle').value.trim(); const content = document.getElementById('tplContent').value.trim();
+  if (!title || !content) return showAlert('alertTemplate', 'Semua kolom wajib diisi.', 'error');
+  if (id) { await api('/api/templates/' + id, 'PUT', { title, content }); cancelEdit(); } 
+  else { await api('/api/templates', 'POST', { title, content }); document.getElementById('tplTitle').value = ''; document.getElementById('tplContent').value = ''; }
+  loadTemplates();
+}
+function editTemplate(id, titleB64, contentB64) {
+  document.getElementById('editTplId').value = id; document.getElementById('tplTitle').value = atob(titleB64); document.getElementById('tplContent').value = atob(contentB64);
+  document.getElementById('tplFormTitle').textContent = 'Ubah Template'; document.getElementById('btnSaveTpl').textContent = 'Update Template'; document.getElementById('btnCancelEdit').classList.remove('hidden');
+}
+function cancelEdit() {
+  document.getElementById('editTplId').value = ''; document.getElementById('tplTitle').value = ''; document.getElementById('tplContent').value = '';
+  document.getElementById('tplFormTitle').textContent = 'Simpan Template Baru'; document.getElementById('btnSaveTpl').textContent = 'Simpan ke Repositori'; document.getElementById('btnCancelEdit').classList.add('hidden');
+}
+function deleteTpl(id) { openModal('Hapus Template', 'Data template akan dihapus permanen.', async () => { await api('/api/templates/' + id, 'DELETE'); loadTemplates(); }); }
+async function loadTemplateOptions() {
+  const data = await api('/api/templates'); const sel = document.getElementById('selectTemplate');
+  sel.innerHTML = '<option value="">— Silakan Pilih Struktur Template —</option>';
+  data.forEach(t => { const o = document.createElement('option'); o.value = t.content; o.textContent = t.title; sel.appendChild(o); });
+}
+
+// INTERACTIVE COMPONENT HELPERS
+function onFileSelect(e) { selectedFile = e.target.files[0]; document.getElementById('dzFile').textContent = selectedFile ? `Terpilih: ${selectedFile.name}` : ''; }
+async function uploadKampanye() {
+  const tpl = document.getElementById('selectTemplate').value; const link = document.getElementById('targetLink').value.trim();
+  if (!tpl || !link || !selectedFile) return showAlert('alertKampanye', 'Setup parameter data belum lengkap.', 'error');
+  const fd = new FormData(); fd.append('file', selectedFile); fd.append('messageTemplate', tpl); fd.append('targetLink', link);
+  const res = await fetch('/api/upload-targets', { method: 'POST', body: fd }); const d = await res.json();
+  if (d.success) showAlert('alertKampanye', `${d.total} target kontak disinkronkan ke buffer.`, 'success');
+}
+async function startBlast() { await api('/api/start-blast', 'POST'); }
+async function stopBlast() { await api('/api/stop-blast', 'POST'); }
+async function resetBlast() { openModal('Reset Antrean', 'Hapus semua data antrean target?', async () => { await api('/api/reset-blast', 'POST'); }); }
+async function refreshStats() {
+  const d = await api('/api/stats'); ST = { total: Number(d.total)||0, sent: Number(d.sent)||0, failed: Number(d.failed)||0, skip: Number(d.skipped)||0 };
+  updateStats(); updateProgress();
+  const rows = await api('/api/blast-targets');
+  if (rows.length) { document.getElementById('logBody').innerHTML = ''; rowCount = 0; rows.slice().reverse().forEach(r => addLogRow(r.id, r.phone_number, r.status)); }
+}
+function updateStats() { document.getElementById('s-total').textContent = ST.total; document.getElementById('s-sent').textContent = ST.sent; document.getElementById('s-failed').textContent = ST.failed; document.getElementById('s-skip').textContent = ST.skip; }
+function updateProgress() {
+  const done = ST.sent + ST.failed + ST.skip; const pct = ST.total ? Math.round(done / ST.total * 100) : 0;
+  document.getElementById('progressBar').style.width = pct + '%'; document.getElementById('kProgressBar').style.width = pct + '%';
+  document.getElementById('progressText').textContent = `${done} / ${ST.total} Kontak`; document.getElementById('progressPct').textContent = pct + '%';
+  document.getElementById('kProgressText').textContent = `${done} / ${ST.total} Kontak`; document.getElementById('kProgressPct').textContent = pct + '%';
+}
+function addLogRow(id, phone, status) {
+  const tbody = document.getElementById('logBody'); const empty = tbody.querySelector('td[colspan]'); if (empty) tbody.innerHTML = ''; rowCount++;
+  const map = { sent: ['bg-emerald-50 text-emerald-700', 'TERKIRIM'], failed: ['bg-rose-50 text-rose-700', 'GAGAL'], not_registered: ['bg-amber-50 text-amber-700', 'BUKAN WA'] };
+  const [cls, label] = map[status] || ['bg-slate-50 text-slate-600', status.toUpperCase()];
+  const tr = document.createElement('tr'); tr.className = 'new-row border-b border-slate-100 hover:bg-slate-50/50 transition-colors';
+  tr.innerHTML = `<td class="py-3 px-6 font-mono text-xs text-slate-400">${rowCount}</td><td class="py-3 px-6 font-mono font-medium text-slate-700">${esc(phone)}</td><td class="py-3 px-6"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${cls}">${label}</span></td><td class="py-3 px-6 font-mono text-xs text-slate-400">${new Date().toLocaleTimeString('id-ID')}</td>`;
+  tbody.insertBefore(tr, tbody.firstChild);
+}
+function setupUIEventListeners() {
+  const dz = document.getElementById('dropzone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('bg-brand-50/40', 'border-brand-500'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('bg-brand-50/40', 'border-brand-500'));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('bg-brand-50/40', 'border-brand-500'); const f = e.dataTransfer.files[0]; if (f?.name.endsWith('.txt')) { selectedFile = f; document.getElementById('dzFile').textContent = f.name; } });
+}
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('-translate-x-full'); document.getElementById('sb-overlay').classList.toggle('hidden'); setTimeout(() => document.getElementById('sb-overlay').classList.toggle('opacity-100'), 5); }
+function closeSidebar() { document.getElementById('sidebar').classList.add('-translate-x-full'); document.getElementById('sb-overlay').classList.remove('opacity-100'); setTimeout(() => document.getElementById('sb-overlay').classList.add('hidden'), 300); }
+function openModal(title, msg, cb) { document.getElementById('modalTitle').textContent = title; document.getElementById('modalMsg').textContent = msg; const m = document.getElementById('modalOverlay'); m.classList.remove('hidden'); m.classList.add('flex'); setTimeout(() => m.classList.add('opacity-100'), 5); _modalCb = cb; document.getElementById('modalConfirm').onclick = () => { closeModal(); _modalCb && _modalCb(); }; }
+function closeModal() { const m = document.getElementById('modalOverlay'); m.classList.remove('opacity-100'); setTimeout(() => { m.classList.remove('flex'); m.classList.add('hidden'); }, 200); _modalCb = null; }
+function showAlert(id, msg, type = 'success') {
+  const el = document.getElementById(id); if (!el) return; if (alertTimers[id]) clearTimeout(alertTimers[id]); el.textContent = msg; el.className = "p-4 rounded-xl text-xs font-semibold block transition-all duration-300 ";
+  if (type === 'success') el.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-200'); else if (type === 'error') el.classList.add('bg-rose-50', 'text-rose-700', 'border-rose-200'); else el.classList.add('bg-amber-50', 'text-amber-700', 'border-amber-200');
+  alertTimers[id] = setTimeout(() => el.className = "hidden", 5000);
+}
+function clearLog() { document.getElementById('logBody').innerHTML = '<tr><td colspan="4" class="py-12 text-center text-panel-muted font-medium">Log stream kosong. Silakan unggah database.</td></tr>'; rowCount = 0; }
+async function api(url, method = 'GET', body) {
+  const opts = { method, headers: {} }; if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  const res = await fetch(url, opts); const data = await res.json(); if (!res.ok) throw new Error(data.error || 'API Error'); return data;
+}
+function esc(str) { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function b64(str) { return btoa(unescape(encodeURIComponent(str))); }
+function now() { return new Date().toLocaleTimeString('id-ID'); }
+</script>
+</body>
+</html>
